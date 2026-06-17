@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import { login, me, refresh, logout, requestPasswordReset, resetPassword, requestEmailVerification, verifyEmail } from '../controllers/auth.controller.js';
+import { protect } from '../middlewares/auth.middleware.js';
+const router = Router();
+router.post('/login', login);
+router.post('/refresh', refresh);
+router.post('/logout', logout);
+router.post('/forgot-password', requestPasswordReset);
+router.post('/reset-password', resetPassword);
+router.post('/request-email-verification', protect, requestEmailVerification);
+router.post('/verify-email', verifyEmail);
+router.get('/me', protect, me);
+export default router;

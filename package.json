@@ -1,0 +1,21 @@
+{
+  "name": "ftjj-mern-platform",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "install:all": "bun install --prefix backend && bun install --prefix frontend",
+    "dev": "bun run --filter \"*\" dev",
+    "build": "bun run build --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "backend": "^0.0.0",
+    "frontend": "^2.0.0-alpha.4"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ]
+}

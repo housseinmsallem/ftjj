@@ -1,0 +1,55 @@
+# Vérification technique statique v7
+
+| Fichier | Statut | Note |
+|---|---:|---|
+| `backend/src/app.js` | OK |  |
+| `backend/src/config/db.js` | OK |  |
+| `backend/src/controllers/auth.controller.js` | OK |  |
+| `backend/src/controllers/crud.controller.js` | OK |  |
+| `backend/src/controllers/dashboard.controller.js` | OK |  |
+| `backend/src/controllers/live.controller.js` | OK |  |
+| `backend/src/controllers/workflow.controller.js` | OK |  |
+| `backend/src/jobs/backup.job.js` | OK |  |
+| `backend/src/middlewares/auth.middleware.js` | OK |  |
+| `backend/src/middlewares/error.middleware.js` | OK |  |
+| `backend/src/models/Athlete.js` | OK |  |
+| `backend/src/models/AuditLog.js` | OK |  |
+| `backend/src/models/Club.js` | OK |  |
+| `backend/src/models/Coach.js` | OK |  |
+| `backend/src/models/Competition.js` | OK |  |
+| `backend/src/models/ContentBlock.js` | OK |  |
+| `backend/src/models/Document.js` | OK |  |
+| `backend/src/models/EmailVerificationToken.js` | OK |  |
+| `backend/src/models/Federation.js` | OK |  |
+| `backend/src/models/FederationSettings.js` | OK |  |
+| `backend/src/models/Fight.js` | OK |  |
+| `backend/src/models/License.js` | OK |  |
+| `backend/src/models/MatchBracket.js` | OK |  |
+| `backend/src/models/Notification.js` | OK |  |
+| `backend/src/models/PasswordResetToken.js` | OK |  |
+| `backend/src/models/Payment.js` | OK |  |
+| `backend/src/models/Referee.js` | OK |  |
+| `backend/src/models/RefreshToken.js` | OK |  |
+| `backend/src/models/UploadAsset.js` | OK |  |
+| `backend/src/models/User.js` | OK |  |
+| `backend/src/routes/auth.routes.js` | OK |  |
+| `backend/src/routes/content.routes.js` | OK |  |
+| `backend/src/routes/crud.routes.js` | OK |  |
+| `backend/src/routes/export.routes.js` | OK |  |
+| `backend/src/routes/index.js` | OK |  |
+| `backend/src/routes/live.routes.js` | OK |  |
+| `backend/src/routes/notifications.routes.js` | OK |  |
+| `backend/src/routes/public.routes.js` | OK |  |
+| `backend/src/routes/resource.routes.js` | OK |  |
+| `backend/src/routes/settings.routes.js` | OK |  |
+| `backend/src/routes/uploads.routes.js` | OK |  |
+| `backend/src/routes/workflow.routes.js` | OK |  |
+| `backend/src/seed.js` | OK |  |
+| `backend/src/server.js` | OK |  |
+| `backend/src/services/mail.service.js` | OK |  |
+| `backend/src/services/sms.service.js` | OK |  |
+| `backend/src/services/storage.service.js` | OK |  |
+| `backend/src/sockets/live.socket.js` | OK |  |
+| `backend/src/utils/audit.js` | OK |  |
+| `backend/src/utils/crypto.js` | OK |  |
+| `backend/src/utils/token.js` | OK |  |

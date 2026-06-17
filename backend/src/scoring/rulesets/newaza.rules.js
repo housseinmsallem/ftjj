@@ -1,0 +1,1 @@
+export const newazaRules = { discipline: 'NEWAZA', durationSeconds: 300, actions: { points: [2,3,4], advantage: 1, penalty: 1, stalling: 1 }, winMethods: ['points','submission','decision','forfeit','disqualification'] };

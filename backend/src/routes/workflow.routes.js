@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import { protect, allowRoles } from '../middlewares/auth.middleware.js';
+import { approveClub, suspendClub, validateDocument, rejectDocument, issueLicense, markPaymentPaid, recalculateRankings } from '../controllers/workflow.controller.js';
+const router = Router();
+router.use(protect, allowRoles('FEDERATION_ADMIN'));
+router.patch('/clubs/:id/approve', approveClub);
+router.patch('/clubs/:id/suspend', suspendClub);
+router.patch('/documents/:id/validate', validateDocument);
+router.patch('/documents/:id/reject', rejectDocument);
+router.post('/licenses/issue', issueLicense);
+router.patch('/payments/:id/paid', markPaymentPaid);
+router.post('/rankings/recalculate', recalculateRankings);
+export default router;

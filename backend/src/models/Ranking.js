@@ -1,0 +1,3 @@
+import mongoose from 'mongoose';
+const rankingSchema = new mongoose.Schema({ federation: { type: mongoose.Schema.Types.ObjectId, ref: 'Federation', index: true }, athlete: { type: mongoose.Schema.Types.ObjectId, ref: 'Athlete' }, club: { type: mongoose.Schema.Types.ObjectId, ref: 'Club' }, discipline: String, category: String, season: Number, points: { type: Number, default: 0 }, wins: { type: Number, default: 0 }, losses: { type: Number, default: 0 }, medals: { gold: { type: Number, default: 0 }, silver: { type: Number, default: 0 }, bronze: { type: Number, default: 0 } } }, { timestamps: true });
+export default mongoose.model('Ranking', rankingSchema);
