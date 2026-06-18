@@ -2,4 +2,11 @@
 - [x] Add endpoint `GET /api/exports/licenses/:id/pdf` in `backend/src/routes/export.routes.js`.
 - [x] Implement dependency-free minimal PDF generation (plain text from License fields).
 - [ ] (Optional later) Add nicer formatting + populate owner (club/athlete/coach/referee).
-
+- [ ] /admin/dashboard: Displaying entire objects in the LatestRegistrations field. should be the name of the athlete or whatever that field refers to.
+- [ ] /admin/platform-settings: Logo field needs to be an image field that handles file upload
+- [ ] /admin/media-library need to add a download button for medias and backend download integration.
+- [ ] /admin/competitions/operations needs to be reworked from the ground up. For the "Inscriptions" of athletes there would need to be a atheletes list that you could choose from. selected atheletes are added to the competition. their weight categories are automatically added to the categories of the competitions. Bracket generation functionality would also be the same.
+- [ ] /admin/documents doesn't make sense.
+- [ ] /admin/payments needs a search bar in the "Id Payeur" rather than writing the actual person's Id. Since we are using mongoDB, Id aren't human readable
+- [ ] /admin/live-scoring needs to search a competition then choose the specific round. Atheletes names would be displayed on each side or Manual registration for atheletes names without the need for competition linking
+- [ ] UI Layout fixing, and figuring out what does our cms forms actually modify

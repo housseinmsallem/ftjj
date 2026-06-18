@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom';
-import logo from '../../assets/images/logo-footer.png';
-import { contactDetails } from '../../data/publicContent';
+import { Link } from "react-router-dom";
+import logo from "../../assets/images/logo-footer.png";
+import { contactDetails } from "../../data/publicContent";
 
 export default function Footer() {
   return (
@@ -9,15 +9,21 @@ export default function Footer() {
         <div className="public-footer-callout">
           <div>
             <p className="eyebrow">Plateforme FTJJ</p>
-            <h3>Un portail plus premium pour le public et les espaces prives</h3>
+            <h3>
+              Un portail plus premium pour le public et les espaces prives
+            </h3>
             <p>
-              Affiliation, annuaires, rankings, live scoring et dashboards metier
-              reunis dans une seule experience plus claire.
+              Affiliation, annuaires, rankings, live scoring et dashboards
+              metier reunis dans une seule experience plus claire.
             </p>
           </div>
           <div className="public-actions compact">
-            <Link className="public-btn primary" to="/espace-licencie">Acceder aux espaces</Link>
-            <Link className="public-btn ghost" to="/affiliation">Demander une affiliation</Link>
+            <Link className="public-btn primary" to="/espace-licencie">
+              Acceder aux espaces
+            </Link>
+            <Link className="public-btn ghost" to="/affiliation">
+              Demander une affiliation
+            </Link>
           </div>
         </div>
       </div>
@@ -29,8 +35,9 @@ export default function Footer() {
             <strong>FTJJ</strong>
             <small>Federation Tunisienne de Jiu-Jitsu</small>
             <p>
-              Portail officiel de la federation: site public, annuaires, competitions,
-              live scoring et services prives pour les profils federaux.
+              Portail officiel de la federation: site public, annuaires,
+              competitions, live scoring et services prives pour les profils
+              federaux.
             </p>
           </div>
         </div>
@@ -62,7 +69,9 @@ export default function Footer() {
         <div className="public-footer-column">
           <h4>Contact</h4>
           <span>{contactDetails.address}</span>
-          <a href={`tel:${contactDetails.phone.replace(/\s+/g, '')}`}>{contactDetails.phone}</a>
+          <a href={`tel:${contactDetails.phone.replace(/\s+/g, "")}`}>
+            {contactDetails.phone}
+          </a>
           <a href={`mailto:${contactDetails.email}`}>{contactDetails.email}</a>
         </div>
       </div>

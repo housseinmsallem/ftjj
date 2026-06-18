@@ -1,32 +1,41 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { publicApi } from '../services/api';
-import { formatJiuJitsuGrade, formatNewazaGrade } from '../utils/grades';
+import React, { useEffect, useMemo, useState } from "react";
+import { publicApi } from "../services/api";
+import { formatJiuJitsuGrade, formatNewazaGrade } from "../utils/grades";
 
 function athleteName(athlete) {
-  return `${athlete.firstName || ''} ${athlete.lastName || ''}`.trim() || athlete.name || 'Athlete FTJJ';
+  return (
+    `${athlete.firstName || ""} ${athlete.lastName || ""}`.trim() ||
+    athlete.name ||
+    "Athlete FTJJ"
+  );
 }
 
 function formatNumber(value) {
-  return new Intl.NumberFormat('fr-FR').format(value);
+  return new Intl.NumberFormat("fr-FR").format(value);
 }
 
 export default function Rankings() {
   const [athletes, setAthletes] = useState([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
-    publicApi.rankings()
+    publicApi
+      .rankings()
       .then((data) => setAthletes(Array.isArray(data) ? data : []))
       .catch(() => setAthletes([]));
   }, []);
 
   const sorted = useMemo(() => {
-    return [...athletes].sort((left, right) => (right.rankingPoints || 0) - (left.rankingPoints || 0));
+    return [...athletes].sort(
+      (left, right) => (right.rankingPoints || 0) - (left.rankingPoints || 0),
+    );
   }, [athletes]);
 
   const filtered = useMemo(() => {
     const term = query.toLowerCase();
-    return sorted.filter((athlete) => JSON.stringify(athlete).toLowerCase().includes(term));
+    return sorted.filter((athlete) =>
+      JSON.stringify(athlete).toLowerCase().includes(term),
+    );
   }, [query, sorted]);
 
   const podium = filtered.slice(0, 3);
@@ -39,8 +48,9 @@ export default function Rankings() {
             <p className="eyebrow">Classement national</p>
             <h1>Ranking public des athletes FTJJ</h1>
             <p className="hero-copy">
-              Ce classement valorise les athletes, leurs clubs, leurs categories et leur progression
-              sportive dans un format plus lisible que la version de base.
+              Ce classement valorise les athletes, leurs clubs, leurs categories
+              et leur progression sportive dans un format plus lisible que la
+              version de base.
             </p>
           </div>
           <div className="surface-card hero-aside">
@@ -48,7 +58,9 @@ export default function Rankings() {
             <ol className="podium-list">
               {podium.map((athlete, index) => (
                 <li key={athlete._id || index}>
-                  <strong>{index + 1}. {athleteName(athlete)}</strong>
+                  <strong>
+                    {index + 1}. {athleteName(athlete)}
+                  </strong>
                   <span>{formatNumber(athlete.rankingPoints || 0)} pts</span>
                 </li>
               ))}
@@ -88,8 +100,8 @@ export default function Rankings() {
                     <tr key={athlete._id || index}>
                       <td>{index + 1}</td>
                       <td>{athleteName(athlete)}</td>
-                      <td>{athlete.club?.name || 'Club FTJJ'}</td>
-                      <td>{athlete.category || 'Non renseignee'}</td>
+                      <td>{athlete.club?.name || "Club FTJJ"}</td>
+                      <td>{athlete.category || "Non renseignee"}</td>
                       <td>{formatJiuJitsuGrade(athlete)}</td>
                       <td>{formatNewazaGrade(athlete)}</td>
                       <td>{formatNumber(athlete.rankingPoints || 0)}</td>

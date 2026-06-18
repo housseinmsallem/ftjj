@@ -2,7 +2,8 @@ const memoryStore = new Map();
 
 function resolveStorage() {
   try {
-    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+    if (typeof window !== "undefined" && window.localStorage)
+      return window.localStorage;
   } catch {
     // Embedded browsers can expose the app without persistent storage.
   }
@@ -16,7 +17,7 @@ function resolveStorage() {
     },
     removeItem(key) {
       memoryStore.delete(key);
-    }
+    },
   };
 }
 
@@ -41,7 +42,7 @@ const storage = {
     } catch {
       memoryStore.delete(key);
     }
-  }
+  },
 };
 
 export default storage;

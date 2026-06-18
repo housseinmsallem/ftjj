@@ -1,58 +1,58 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link, NavLink, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import logo from '../../assets/images/logo.png';
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import logo from "../../assets/images/logo.png";
 
 const utilityLinks = [
-  { to: '/federation', label: 'A propos' },
-  { to: '/clubs', label: 'Organisateurs' },
-  { to: '/contact', label: 'Support' }
+  { to: "/federation", label: "A propos" },
+  { to: "/clubs", label: "Organisateurs" },
+  { to: "/contact", label: "Support" },
 ];
 
 const mainLeftLinks = [
-  { to: '/competitions', label: 'Evenements' },
-  { to: '/ranking', label: 'Rankings' },
-  { to: '/athletes', label: 'Athletes' }
+  { to: "/competitions", label: "Evenements" },
+  { to: "/ranking", label: "Rankings" },
+  { to: "/athletes", label: "Athletes" },
 ];
 
 const mainRightLinks = [
-  { to: '/actualites', label: 'Actualites' },
-  { to: '/medias', label: 'Medias' },
-  { to: '/en-direct', label: 'Live' }
+  { to: "/actualites", label: "Actualites" },
+  { to: "/medias", label: "Medias" },
+  { to: "/en-direct", label: "Live" },
 ];
 
 const directoryLinks = [
-  { to: '/clubs', label: 'Clubs' },
-  { to: '/coaches', label: 'Coachs' },
-  { to: '/referees', label: 'Arbitres' },
-  { to: '/affiliation', label: 'Affiliation' }
+  { to: "/clubs", label: "Clubs" },
+  { to: "/coaches", label: "Coachs" },
+  { to: "/referees", label: "Arbitres" },
+  { to: "/affiliation", label: "Affiliation" },
 ];
 
-const socialMarks = ['WA', 'FB', 'IG', 'YT'];
-const partnerMarks = ['JJIF', 'UNJA', 'FTJJ SaaS'];
+const socialMarks = ["WA", "FB", "IG", "YT"];
+const partnerMarks = ["JJIF", "UNJA", "FTJJ SaaS"];
 
 function uniqueLinks(items) {
   return Array.from(new Map(items.map((item) => [item.to, item])).values());
 }
 
 function dashboardLinkFor(user) {
-  if (!user) return '/espace-licencie';
-  if (user.role === 'FEDERATION_ADMIN') return '/admin';
-  if (user.role === 'CLUB_ADMIN') return '/club';
-  if (user.role === 'ATHLETE') return '/athlete/dashboard';
-  if (user.role === 'COACH') return '/coach/dashboard';
-  if (user.role === 'REFEREE') return '/referee/dashboard';
-  return '/espace-licencie';
+  if (!user) return "/espace-licencie";
+  if (user.role === "FEDERATION_ADMIN") return "/admin";
+  if (user.role === "CLUB_ADMIN") return "/club";
+  if (user.role === "ATHLETE") return "/athlete/dashboard";
+  if (user.role === "COACH") return "/coach/dashboard";
+  if (user.role === "REFEREE") return "/referee/dashboard";
+  return "/espace-licencie";
 }
 
 function dashboardLabelFor(user) {
-  if (!user) return 'Espace licencie';
-  if (user.role === 'FEDERATION_ADMIN') return 'Backoffice';
-  if (user.role === 'CLUB_ADMIN') return 'Espace club';
-  if (user.role === 'ATHLETE') return 'Espace athlete';
-  if (user.role === 'COACH') return 'Espace coach';
-  if (user.role === 'REFEREE') return 'Espace arbitre';
-  return 'Mon espace';
+  if (!user) return "Espace licencie";
+  if (user.role === "FEDERATION_ADMIN") return "Backoffice";
+  if (user.role === "CLUB_ADMIN") return "Espace club";
+  if (user.role === "ATHLETE") return "Espace athlete";
+  if (user.role === "COACH") return "Espace coach";
+  if (user.role === "REFEREE") return "Espace arbitre";
+  return "Mon espace";
 }
 
 export default function Header() {
@@ -62,15 +62,16 @@ export default function Header() {
   const portalLink = useMemo(() => dashboardLinkFor(user), [user]);
   const portalLabel = useMemo(() => dashboardLabelFor(user), [user]);
   const mobileLinks = useMemo(
-    () => uniqueLinks([
-      { to: '/', label: 'Accueil', end: true },
-      ...mainLeftLinks,
-      { to: portalLink, label: portalLabel },
-      ...mainRightLinks,
-      ...directoryLinks,
-      ...utilityLinks
-    ]),
-    [portalLabel, portalLink]
+    () =>
+      uniqueLinks([
+        { to: "/", label: "Accueil", end: true },
+        ...mainLeftLinks,
+        { to: portalLink, label: portalLabel },
+        ...mainRightLinks,
+        ...directoryLinks,
+        ...utilityLinks,
+      ]),
+    [portalLabel, portalLink],
   );
 
   useEffect(() => {
@@ -83,23 +84,44 @@ export default function Header() {
         <div className="public-utility-inner">
           <div className="public-utility-left">
             <div className="public-social-strip" aria-hidden="true">
-              {socialMarks.map((mark) => <span className="public-social-mark" key={mark}>{mark}</span>)}
+              {socialMarks.map((mark) => (
+                <span className="public-social-mark" key={mark}>
+                  {mark}
+                </span>
+              ))}
             </div>
-            <div className="public-partner-strip desktop-only" aria-hidden="true">
-              {partnerMarks.map((mark) => <span className="public-partner-pill" key={mark}>{mark}</span>)}
+            <div
+              className="public-partner-strip desktop-only"
+              aria-hidden="true"
+            >
+              {partnerMarks.map((mark) => (
+                <span className="public-partner-pill" key={mark}>
+                  {mark}
+                </span>
+              ))}
             </div>
           </div>
 
           <div className="public-utility-right">
             {utilityLinks.map((item) => (
-              <NavLink key={item.to} to={item.to}>{item.label}</NavLink>
+              <NavLink key={item.to} to={item.to}>
+                {item.label}
+              </NavLink>
             ))}
             {user ? (
-              <button className="public-utility-button" type="button" onClick={logout}>Deconnexion</button>
+              <button
+                className="public-utility-button"
+                type="button"
+                onClick={logout}
+              >
+                Deconnexion
+              </button>
             ) : (
               <NavLink to="/login">Connexion</NavLink>
             )}
-            <Link className="public-utility-cta desktop-only" to="/affiliation">Affiliation</Link>
+            <Link className="public-utility-cta desktop-only" to="/affiliation">
+              Affiliation
+            </Link>
             <span className="public-locale-pill">TN</span>
           </div>
         </div>
@@ -107,9 +129,14 @@ export default function Header() {
 
       <div className="public-header-main">
         <div className="public-header-inner public-header-grid">
-          <nav className="public-nav public-nav-cluster public-nav-left" aria-label="Navigation principale gauche">
+          <nav
+            className="public-nav public-nav-cluster public-nav-left"
+            aria-label="Navigation principale gauche"
+          >
             {mainLeftLinks.map((item) => (
-              <NavLink key={item.to} to={item.to}>{item.label}</NavLink>
+              <NavLink key={item.to} to={item.to}>
+                {item.label}
+              </NavLink>
             ))}
           </nav>
 
@@ -123,10 +150,15 @@ export default function Header() {
             </span>
           </Link>
 
-          <nav className="public-nav public-nav-cluster public-nav-right" aria-label="Navigation principale droite">
+          <nav
+            className="public-nav public-nav-cluster public-nav-right"
+            aria-label="Navigation principale droite"
+          >
             <NavLink to={portalLink}>{portalLabel}</NavLink>
             {mainRightLinks.map((item) => (
-              <NavLink key={item.to} to={item.to}>{item.label}</NavLink>
+              <NavLink key={item.to} to={item.to}>
+                {item.label}
+              </NavLink>
             ))}
           </nav>
 
@@ -138,27 +170,39 @@ export default function Header() {
               aria-label="Ouvrir le menu"
               onClick={() => setOpen((value) => !value)}
             >
-              {open ? 'x' : '|||'}
+              {open ? "x" : "|||"}
             </button>
           </div>
         </div>
       </div>
 
-      <div className={`public-mobile-menu ${open ? 'open' : ''}`}>
+      <div className={`public-mobile-menu ${open ? "open" : ""}`}>
         <div className="public-mobile-scroll">
           <div className="public-mobile-group">
             <span>Navigation</span>
             {mobileLinks.map((item) => (
-              <NavLink key={item.to} end={item.end} to={item.to}>{item.label}</NavLink>
+              <NavLink key={item.to} end={item.end} to={item.to}>
+                {item.label}
+              </NavLink>
             ))}
           </div>
           <div className="public-mobile-group">
             <span>Compte</span>
-            <Link className="public-mobile-button-link" to="/affiliation">Affiliation</Link>
+            <Link className="public-mobile-button-link" to="/affiliation">
+              Affiliation
+            </Link>
             {user ? (
-              <button className="public-mobile-button" type="button" onClick={logout}>Deconnexion</button>
+              <button
+                className="public-mobile-button"
+                type="button"
+                onClick={logout}
+              >
+                Deconnexion
+              </button>
             ) : (
-              <Link className="public-mobile-button-link" to="/login">Connexion</Link>
+              <Link className="public-mobile-button-link" to="/login">
+                Connexion
+              </Link>
             )}
           </div>
         </div>
