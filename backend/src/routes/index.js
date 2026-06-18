@@ -60,7 +60,7 @@ router.use('/live', liveRoutes);
 router.get('/dashboard/stats', protect, allowRoles('SUPER_ADMIN','FEDERATION_ADMIN','COMPETITION_MANAGER'), stats);
 router.use('/workflow', workflowRoutes);
 router.use('/content', contentRoutes);
-router.use('/clubs', resourceRoutes(crudController(Club, { }), true));
+router.use('/clubs', resourceRoutes(crudController(Club), true));
 router.use('/athletes', resourceRoutes(crudController(Athlete, { populate: 'club', search: true })));
 router.use('/coaches', resourceRoutes(crudController(Coach, { populate: 'club' })));
 router.use('/referees', resourceRoutes(crudController(Referee)));

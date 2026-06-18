@@ -232,12 +232,31 @@ export default function AdminResourcePage({ type }) {
     }
   }
 
+  async function exportLicensePdf(row) {
+    try {
+      const url = `/exports/licenses/${row._id}/pdf`;
+      const res = await api.get(url, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `ftjj-licence-${row._id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Export licence impossible');
+    }
+  }
+
   const actionColumn = {
     key: 'adminActions',
     label: 'Actions',
     render: (row) => (
       <div className="table-row-actions">
         {cfg.fields.length > 0 && <button className="ghost" type="button" onClick={() => setEditing(row)}>Modifier</button>}
+        {type === 'licenses' && <button className="ghost" type="button" onClick={() => exportLicensePdf(row)}>Exporter PDF</button>}
         {type === 'clubs' && row.affiliationStatus !== 'APPROVED' && <button className="primary" type="button" onClick={() => approveClub(row)}>Approuver</button>}
         {type === 'clubs' && row.affiliationStatus === 'APPROVED' && <button className="ghost" type="button" onClick={() => suspendClub(row)}>Suspendre</button>}
         {type !== 'audit-logs' && <button className="ghost danger" type="button" onClick={() => remove(row)}>Supprimer</button>}

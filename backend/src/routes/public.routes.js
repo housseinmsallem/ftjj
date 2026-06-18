@@ -48,7 +48,23 @@ router.post('/affiliation', async (req, res, next) => { try {
   if (!name || !email || !password) return res.status(400).json({ message: 'Nom, email et mot de passe requis' });
   const existing = await User.findOne({ email });
   if (existing) return res.status(409).json({ message: 'Un compte existe déjà avec cet email' });
-  const club = await Club.create({ name, governorate, address, president, email, phone, affiliationStatus:'PENDING', status:'PENDING', notes: message });
+  // This platform is single-federation, so attach the created club to the only federation.
+  const federationSettings = await FederationSettings.findOne().lean();
+  const federationId = federationSettings?.federation || federationSettings?._id;
+
+  const club = await Club.create({
+    federation: federationId,
+    name,
+    governorate,
+    address,
+    president,
+    email,
+    phone,
+    affiliationStatus: 'PENDING',
+    status: 'PENDING',
+    notes: message
+  });
+
   await User.create({ name: president || name, email, password, role:'CLUB_ADMIN', club: club._id, isActive:false });
   res.status(201).json({ message:'Demande affiliation recue. Le compte club sera active apres validation federale.', club });
 } catch(e){ next(e); }});
