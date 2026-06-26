@@ -8,6 +8,7 @@ const clubSchema = new mongoose.Schema({
   president: String,
   email: String,
   phone: String,
+  logo:{ type: String, required: false},
   affiliationStatus: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'], default: 'PENDING' },
   licenseYear: { type: Number, default: new Date().getFullYear() },
   documents: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Document' }]

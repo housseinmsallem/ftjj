@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-export default function SmartTable({ columns, rows = [], title, actions }) {
+import { ExportLicence } from "../licences/exportLicence";
+export default function SmartTable({ columns, rows = [], title, actions, showExportLicence = false }) {
   const [q, setQ] = useState("");
   const filtered = useMemo(
     () =>
@@ -31,6 +32,7 @@ export default function SmartTable({ columns, rows = [], title, actions }) {
               {columns.map((c) => (
                 <th key={c.key}>{c.label}</th>
               ))}
+              {showExportLicence && <th>Licence</th>}
             </tr>
           </thead>
           <tbody>
@@ -41,6 +43,11 @@ export default function SmartTable({ columns, rows = [], title, actions }) {
                     {c.render ? c.render(row, i) : row[c.key]}
                   </td>
                 ))}
+                {showExportLicence && (
+                  <td>
+                    <ExportLicence holderData={row} />
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

@@ -51,6 +51,7 @@
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
         "react-router-dom": "^6.30.1",
+        "react-to-print": "^3.3.0",
         "socket.io-client": "^4.8.3",
         "vite": "^6.0.7",
       },
@@ -1286,6 +1287,8 @@
     "react-router": ["react-router@6.30.4", "", { "dependencies": { "@remix-run/router": "1.23.3" }, "peerDependencies": { "react": ">=16.8" } }, "sha512-SVUsDe+DybHM/WmYKIVYhZh1o5Dcuf16yM6WjG02Q9XVFMZIJyHYhwrr6bFBXZkVP6z69kNkMyBCujt8FaFLJA=="],
 
     "react-router-dom": ["react-router-dom@6.30.4", "", { "dependencies": { "@remix-run/router": "1.23.3", "react-router": "6.30.4" }, "peerDependencies": { "react": ">=16.8", "react-dom": ">=16.8" } }, "sha512-q4HvNl+mmDdkS0g+MqiBZNteQJCuimWoOyHMy4T/RQLAn9Z29+E91QXRaxOujeMl2HTzRSS0KFPd7lxX3PjV0Q=="],
+
+    "react-to-print": ["react-to-print@3.3.0", "", { "peerDependencies": { "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ~19" } }, "sha512-7j9GIeNZA9glZlbv9mIbIHDOOx+WYfRMbJzh04NiSKjdaeGkxJuKjJQrtRuNKtt5AvEVVjrLCPokZ9yJX51Fvg=="],
 
     "read-pkg": ["read-pkg@1.1.0", "", { "dependencies": { "load-json-file": "^1.0.0", "normalize-package-data": "^2.3.2", "path-type": "^1.0.0" } }, "sha512-7BGwRHqt4s/uVbuyoeejRn4YmFnYZiFl4AuaeXHlgZf3sONF0SOGlxs2Pw8g6hCKupo08RafIO5YXFNOKTfwsQ=="],
 

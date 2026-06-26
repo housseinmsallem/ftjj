@@ -8,13 +8,20 @@ import Fight from '../models/Fight.js';
 import Athlete from '../models/Athlete.js';
 import { protect, allowRoles } from '../middlewares/auth.middleware.js';
 import { audit } from '../utils/audit.js';
-import { buildOfficialCategories } from '../competition/categoryEngine.js';
+import { buildOfficialCategories, enrichRegistrationFromAthlete, rederiveRegistrationCategories } from '../competition/categoryEngine.js';
 import { generateSingleEliminationBracket } from '../competition/bracketSeeding.service.js';
+import { processBracketAdvancement } from '../competition/bracketAdvancement.service.js';
 
 const router = Router();
 const adminRoles = ['SUPER_ADMIN','FEDERATION_ADMIN','COMPETITION_MANAGER'];
-const scoringRoles = [...adminRoles, 'REFEREE', 'TABLE_OPERATOR'];
 function scope(req) { return req.user?.federation && req.user.role !== 'SUPER_ADMIN' ? { federation: req.user.federation } : {}; }
+
+async function applyAthleteEnrichment(payload, athleteId) {
+  if (!athleteId) return payload;
+  const athlete = await Athlete.findById(athleteId);
+  if (!athlete) return payload;
+  return enrichRegistrationFromAthlete(payload, athlete);
+}
 
 router.get('/:competitionId/registrations', protect, async (req, res) => {
   const query = { competitionId: req.params.competitionId, ...scope(req) };
@@ -23,12 +30,26 @@ router.get('/:competitionId/registrations', protect, async (req, res) => {
 });
 
 router.post('/:competitionId/registrations', protect, allowRoles('SUPER_ADMIN','FEDERATION_ADMIN','COMPETITION_MANAGER','CLUB_ADMIN','COACH'), async (req, res) => {
-  const payload = { ...req.body, competitionId: req.params.competitionId, submittedBy: req.user._id, ...scope(req) };
+  let payload = { ...req.body, competitionId: req.params.competitionId, submittedBy: req.user._id, ...scope(req) };
   if (!payload.clubId && req.user.club) payload.clubId = req.user.club;
-  if (payload.athleteId && (!payload.firstName || !payload.lastName)) {
-    const athlete = await Athlete.findById(payload.athleteId);
-    if (athlete) Object.assign(payload, { firstName: athlete.firstName, lastName: athlete.lastName, gender: athlete.gender, clubId: payload.clubId || athlete.club, belt: athlete.belt, licenseNumber: athlete.licenseNumber, licenseStatus: athlete.licenseStatus, weightDeclared: payload.weightDeclared || athlete.weight });
+
+  if (adminRoles.includes(req.user.role) && !payload.athleteId) {
+    return res.status(400).json({ message: 'Un athlete doit etre selectionne pour cette inscription' });
   }
+
+  if (payload.athleteId) {
+    const duplicate = await CompetitionRegistration.findOne({
+      competitionId: req.params.competitionId,
+      athleteId: payload.athleteId,
+      discipline: payload.discipline || 'NEWAZA',
+      ...scope(req),
+    });
+    if (duplicate) {
+      return res.status(409).json({ message: 'Cet athlete est deja inscrit a cette discipline pour cette competition' });
+    }
+    payload = await applyAthleteEnrichment(payload, payload.athleteId);
+  }
+
   const reg = await CompetitionRegistration.create(payload);
   await ClubCompetitionRegistration.findOneAndUpdate({ competitionId: req.params.competitionId, clubId: reg.clubId, ...scope(req) }, { $addToSet: { athletes: reg._id }, status: 'submitted', submittedAt: new Date(), submittedBy: req.user._id }, { upsert: true, new: true });
   await audit({ actor: req.user._id, action: 'COMPETITION_REGISTRATION_CREATED', entity: 'CompetitionRegistration', entityId: reg._id });
@@ -39,7 +60,29 @@ router.patch('/registrations/:id', protect, async (req, res) => {
   const current = await CompetitionRegistration.findOne({ _id: req.params.id, ...scope(req) });
   if (!current) return res.status(404).json({ message: 'Inscription introuvable' });
   if (req.user.role === 'CLUB_ADMIN' && String(current.clubId) !== String(req.user.club)) return res.status(403).json({ message: 'Acces non autorise' });
-  const reg = await CompetitionRegistration.findByIdAndUpdate(req.params.id, { ...req.body, status: req.body.status || 'modified' }, { new: true, runValidators: true });
+
+  let updates = { ...req.body, status: req.body.status || 'modified' };
+  const athleteChanged = updates.athleteId && String(updates.athleteId) !== String(current.athleteId);
+  const weightChanged = updates.weightDeclared != null || updates.weightVerified != null;
+
+  if (athleteChanged) {
+    updates = await applyAthleteEnrichment({ ...current.toObject(), ...updates }, updates.athleteId);
+  } else if (weightChanged || updates.discipline) {
+    const merged = { ...current.toObject(), ...updates };
+    if (updates.discipline && current.athleteId) {
+      const athlete = await Athlete.findById(current.athleteId);
+      if (athlete) {
+        updates.belt = updates.discipline === 'NEWAZA'
+          ? (athlete.newazaBelt || athlete.belt || 'WHITE')
+          : (athlete.jiujitsuBelt || athlete.belt || 'WHITE');
+      }
+    }
+    const derived = rederiveRegistrationCategories(merged);
+    updates.ageCategory = derived.ageCategory;
+    updates.weightCategory = derived.weightCategory;
+  }
+
+  const reg = await CompetitionRegistration.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
   await audit({ actor: req.user._id, action: 'COMPETITION_REGISTRATION_UPDATED', entity: 'CompetitionRegistration', entityId: reg._id, metadata: req.body });
   res.json(reg);
 });
@@ -60,6 +103,19 @@ router.post('/:competitionId/registrations/validate-all', protect, allowRoles(..
   const result = await CompetitionRegistration.updateMany({ competitionId: req.params.competitionId, status: { $in: ['submitted','pending_validation','modified'] }, ...scope(req) }, { status: 'approved', federationDecision: 'approved', $push: { validationHistory: { status: 'approved', comment: 'Validation globale', actor: req.user._id } } });
   await audit({ actor: req.user._id, action: 'REGISTRATIONS_VALIDATE_ALL', entity: 'Competition', entityId: req.params.competitionId, metadata: result });
   res.json(result);
+});
+
+router.get('/:competitionId/category-preview', protect, allowRoles(...adminRoles), async (req, res) => {
+  const competition = await Competition.findOne({ _id: req.params.competitionId, ...scope(req) });
+  if (!competition) return res.status(404).json({ message: 'Competition introuvable' });
+  const registrations = await CompetitionRegistration.find({ competitionId: competition._id, status: 'approved', ...scope(req) });
+  const notApproved = await CompetitionRegistration.countDocuments({ competitionId: competition._id, status: { $ne: 'approved' }, ...scope(req) });
+  res.json({
+    preview: buildOfficialCategories(registrations, competition),
+    approvedCount: registrations.length,
+    notApprovedCount: notApproved,
+    ready: notApproved === 0 && registrations.length > 0,
+  });
 });
 
 router.post('/:competitionId/generate-categories', protect, allowRoles(...adminRoles), async (req, res) => {
@@ -108,17 +164,13 @@ router.patch('/:competitionId/publish-brackets', protect, allowRoles(...adminRol
 });
 
 router.get('/:competitionId/categories', protect, async (req, res) => res.json(await Category.find({ competitionId: req.params.competitionId, ...scope(req) }).sort('order')));
-router.get('/:competitionId/brackets', protect, async (req, res) => res.json(await Bracket.find({ competitionId: req.params.competitionId, ...scope(req) }).populate('categoryId seeds.athlete').sort('createdAt')));
+router.get('/:competitionId/brackets', protect, async (req, res) => res.json(await Bracket.find({ competitionId: req.params.competitionId, ...scope(req) }).populate('categoryId seeds.athlete rounds.matches.redAthlete rounds.matches.blueAthlete').sort('createdAt')));
 router.post('/:competitionId/brackets/send-to-live', protect, allowRoles(...adminRoles), async (req, res) => {
-  const brackets = await Bracket.find({ competitionId: req.params.competitionId, ...scope(req) }).populate('categoryId');
-  const fights = [];
+  const brackets = await Bracket.find({ competitionId: req.params.competitionId, ...scope(req) });
   for (const bracket of brackets) {
-    const firstRound = bracket.rounds?.[0]?.matches || [];
-    for (const match of firstRound) {
-      const fight = await Fight.create({ ...scope(req), competition: req.params.competitionId, category: bracket.name, redAthlete: match.redAthlete, blueAthlete: match.blueAthlete, mat: req.body.mat || 'Tatami 1', status: 'SCHEDULED' });
-      fights.push(fight);
-    }
+    await processBracketAdvancement(bracket);
   }
+  const fights = await Fight.find({ competition: req.params.competitionId });
   await audit({ actor: req.user._id, action: 'BRACKETS_SENT_TO_LIVE', entity: 'Competition', entityId: req.params.competitionId, metadata: { fights: fights.length } });
   res.status(201).json(fights);
 });

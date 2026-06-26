@@ -120,7 +120,8 @@ const [athleteAhmed, athleteYassine] = await Athlete.create([
 
 const coach = await Coach.create({
   federation: federation._id,
-  name: 'Coach National',
+  firstName: 'Coach FirstName',
+  lastName: 'Coach Last Name',  
   email: 'coach@ftjj.tn',
   phone: '+216 21 333 333',
   club: club._id,
@@ -134,12 +135,12 @@ const coach = await Coach.create({
 
 
 const demoAthletes = await Athlete.create([
-  { federation: federation._id, firstName: 'Nelson', lastName: 'Craft', club: berserkers._id, category: 'Pro Men -76.9 kg', weight: 76.9, gender: 'MALE', belt: 'BLUE', jiujitsuBelt: 'BLUE', newazaBelt: 'BLUE', licenseNumber: 'FTJJ-DEMO-RED', licenseStatus: 'ACTIVE', rankingPoints: 50 },
-  { federation: federation._id, firstName: 'Mike', lastName: 'Smith', club: gracie._id, category: 'Pro Men -76.9 kg', weight: 76.9, gender: 'MALE', belt: 'BLUE', jiujitsuBelt: 'BLUE', newazaBelt: 'BLUE', licenseNumber: 'FTJJ-DEMO-BLUE', licenseStatus: 'ACTIVE', rankingPoints: 45 },
-  { federation: federation._id, firstName: 'Sami', lastName: 'Ben Ali', club: tunisAcademy._id, category: 'Pro Men -76.9 kg', weight: 75, gender: 'MALE', belt: 'BLUE', jiujitsuBelt: 'BLUE', newazaBelt: 'BLUE', licenseNumber: 'FTJJ-DEMO-003', licenseStatus: 'ACTIVE' },
-  { federation: federation._id, firstName: 'Karim', lastName: 'Mrad', club: berserkers._id, category: 'Pro Men -76.9 kg', weight: 76, gender: 'MALE', belt: 'BLUE', jiujitsuBelt: 'BLUE', newazaBelt: 'BLUE', licenseNumber: 'FTJJ-DEMO-004', licenseStatus: 'ACTIVE' },
-  { federation: federation._id, firstName: 'Youssef', lastName: 'Amri', club: gracie._id, category: 'Pro Men -76.9 kg', weight: 75.5, gender: 'MALE', belt: 'BLUE', jiujitsuBelt: 'BLUE', newazaBelt: 'BLUE', licenseNumber: 'FTJJ-DEMO-005', licenseStatus: 'ACTIVE' },
-  { federation: federation._id, firstName: 'Maya', lastName: 'Triki', club: tunisAcademy._id, category: 'Adult Women -63 kg', weight: 62, gender: 'FEMALE', belt: 'WHITE', jiujitsuBelt: 'WHITE', newazaBelt: 'WHITE', licenseNumber: 'FTJJ-DEMO-006', licenseStatus: 'ACTIVE' }
+  { federation: federation._id, firstName: 'Nelson', lastName: 'Craft', club: berserkers._id, category: 'Pro Men -76.9 kg', weight: 76.9, gender: 'MALE', belt: 'BLUE', jiujitsuBelt: 'BLUE', newazaBelt: 'BLUE', licenseNumber: 'FTJJ-DEMO-RED', licenseStatus: 'ACTIVE', rankingPoints: 50,birthDate: new Date('1995-05-15') },
+  { federation: federation._id, firstName: 'Mike', lastName: 'Smith', club: gracie._id, category: 'Pro Men -76.9 kg', weight: 76.9, gender: 'MALE', belt: 'BLUE', jiujitsuBelt: 'BLUE', newazaBelt: 'BLUE', licenseNumber: 'FTJJ-DEMO-BLUE', licenseStatus: 'ACTIVE', rankingPoints: 45, birthDate: new Date('1994-08-20') },
+  { federation: federation._id, firstName: 'Sami', lastName: 'Ben Ali', club: tunisAcademy._id, category: 'Pro Men -76.9 kg', weight: 75, gender: 'MALE', belt: 'BLUE', jiujitsuBelt: 'BLUE', newazaBelt: 'BLUE', licenseNumber: 'FTJJ-DEMO-003', licenseStatus: 'ACTIVE' ,birthDate: new Date('1994-08-20') },
+  { federation: federation._id, firstName: 'Karim', lastName: 'Mrad', club: berserkers._id, category: 'Pro Men -76.9 kg', weight: 76, gender: 'MALE', belt: 'BLUE', jiujitsuBelt: 'BLUE', newazaBelt: 'BLUE', licenseNumber: 'FTJJ-DEMO-004', licenseStatus: 'ACTIVE' ,birthDate: new Date('1994-08-20')},
+  { federation: federation._id, firstName: 'Youssef', lastName: 'Amri', club: gracie._id, category: 'Pro Men -76.9 kg', weight: 75.5, gender: 'MALE', belt: 'BLUE', jiujitsuBelt: 'BLUE', newazaBelt: 'BLUE', licenseNumber: 'FTJJ-DEMO-005', licenseStatus: 'ACTIVE' ,birthDate: new Date('1994-08-20')},
+  { federation: federation._id, firstName: 'Maya', lastName: 'Triki', club: tunisAcademy._id, category: 'Adult Women -63 kg', weight: 62, gender: 'FEMALE', belt: 'WHITE', jiujitsuBelt: 'WHITE', newazaBelt: 'WHITE', licenseNumber: 'FTJJ-DEMO-006', licenseStatus: 'ACTIVE' ,birthDate: new Date('1994-08-20')}
 ]);
 
 const competition = await Competition.create({
@@ -169,7 +170,8 @@ await ScoringSession.create({ federation: federation._id, fight: demoFight._id, 
 
 const referee = await Referee.create({
   federation: federation._id,
-  name: 'Arbitre Officiel',
+  firstName: 'Arbitre',
+  lastName: 'Officiel',
   email: 'referee@ftjj.tn',
   phone: '+216 22 444 444',
   licenseNumber: 'REF-2026-001',
@@ -275,11 +277,11 @@ await ContentBlock.create([
 ]);
 
 await User.create([
-  { name: 'Administrateur FTJJ', email: 'admin@ftjj.tn', password: 'password123', role: 'FEDERATION_ADMIN', federation: federation._id },
-  { name: 'Club Admin', email: 'club@ftjj.tn', password: 'password123', role: 'CLUB_ADMIN', federation: federation._id, club: club._id },
-  { name: `${athleteAhmed.firstName} ${athleteAhmed.lastName}`, email: 'athlete@ftjj.tn', password: 'password123', role: 'ATHLETE', federation: federation._id, club: club._id, athleteProfile: athleteAhmed._id },
-  { name: coach.name, email: 'coach@ftjj.tn', password: 'password123', role: 'COACH', federation: federation._id, club: club._id, coachProfile: coach._id },
-  { name: referee.name, email: 'referee@ftjj.tn', password: 'password123', role: 'REFEREE', federation: federation._id, refereeProfile: referee._id }
+  { firstName: 'Administrateur FTJJ', lastName: 'Admin', email: 'admin@ftjj.tn', password: 'password123', role: 'FEDERATION_ADMIN', federation: federation._id },
+  { firstName: 'Club', lastName: 'Admin', email: 'club@ftjj.tn', password: 'password123', role: 'CLUB_ADMIN', federation: federation._id, club: club._id },
+  { firstName: athleteAhmed.firstName, lastName: athleteAhmed.lastName, email: 'athlete@ftjj.tn', password: 'password123', role: 'ATHLETE', federation: federation._id, club: club._id, athleteProfile: athleteAhmed._id },
+  { firstName: coach.firstName, lastName: coach.lastName, email: 'coach@ftjj.tn', password: 'password123', role: 'COACH', federation: federation._id, club: club._id, coachProfile: coach._id },
+  { firstName: referee.firstName, lastName: referee.lastName, email: 'referee@ftjj.tn', password: 'password123', role: 'REFEREE', federation: federation._id, refereeProfile: referee._id }
 ]);
 
 console.log('Seed termine. Comptes: admin@ftjj.tn, club@ftjj.tn, athlete@ftjj.tn, coach@ftjj.tn, referee@ftjj.tn / password123');

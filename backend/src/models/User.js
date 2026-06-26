@@ -2,7 +2,8 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
-  name: { type: String, required: true, trim: true },
+  firstName: { type: String, required: true, trim: true },
+  lastName: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true, minlength: 6, select: false },
   role: { type: String, enum: ['SUPER_ADMIN', 'FEDERATION_ADMIN', 'COMPETITION_MANAGER', 'CLUB_ADMIN', 'COACH', 'REFEREE', 'ATHLETE', 'TABLE_OPERATOR', 'MEDIA_MANAGER', 'PUBLIC_VIEWER'], default: 'CLUB_ADMIN' },

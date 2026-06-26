@@ -10,7 +10,8 @@ const utilityLinks = [
 ];
 
 const mainLeftLinks = [
-  { to: "/competitions", label: "Evenements" },
+  { to: "/competitions", label: "Competitions" },
+  // { to: "/events", label: "Evenements" },
   { to: "/ranking", label: "Rankings" },
   { to: "/athletes", label: "Athletes" },
 ];

@@ -5,11 +5,15 @@ import api from "../../services/api";
 const moduleConfig = {
   dashboard: {
     title: "Dashboard federal",
+    description: "Vue rapide des activites et indicateurs de la plateforme.",
     endpoint: "/dashboard/stats",
     mode: "dashboard",
   },
-  cms: {
-    title: "CMS accueil",
+  homepage: {
+    title: "Page d'accueil",
+    description:
+      "Texte principal, boutons et etat de publication de la page d'accueil publique.",
+    sectionTitle: "Contenu principal",
     endpoint: "/cms/homepage",
     mode: "settings",
     fields: [
@@ -24,7 +28,10 @@ const moduleConfig = {
     ],
   },
   settings: {
-    title: "Parametres plateforme",
+    title: "Identite federale",
+    description:
+      "Nom, logo, couleurs et coordonnees officielles utilises sur le site public.",
+    sectionTitle: "Identite et contact",
     endpoint: "/cms/platform-settings",
     mode: "settings",
     fields: [
@@ -44,6 +51,7 @@ const moduleConfig = {
   media: { title: "Mediatheque federale", endpoint: "/media", mode: "media" },
   events: {
     title: "Evenements",
+    description: "Gestion des evenements publics de la federation.",
     endpoint: "/events",
     mode: "crud",
     fields: [
@@ -61,6 +69,7 @@ const moduleConfig = {
   },
   news: {
     title: "Actualites",
+    description: "Publication des actualites officielles.",
     endpoint: "/news",
     mode: "crud",
     fields: [
@@ -75,21 +84,68 @@ const moduleConfig = {
   },
   registrations: {
     title: "Inscriptions competitions",
+    description: "Liste des inscriptions aux competitions.",
     endpoint: "/registrations",
     mode: "table",
   },
-  categories: { title: "Categories", endpoint: "/categories", mode: "table" },
+  categories: {
+    title: "Categories",
+    description: "Categories generees ou administrees pour les competitions.",
+    endpoint: "/categories",
+    mode: "table",
+  },
   brackets: {
     title: "Bracket builder",
+    description: "Suivi des tableaux de competition generes.",
     endpoint: "/brackets",
     mode: "brackets",
   },
   scoringSettings: {
     title: "Reglages scoring",
+    description: "Parametres techniques des disciplines et durees de combat.",
     endpoint: "/scoring-settings",
     mode: "crud",
     fields: ["discipline", "rulesetName", "durationSeconds"],
   },
+};
+
+const fieldLabels = {
+  heroTitle: "Titre principal",
+  heroSubtitle: "Sous-titre",
+  introduction: "Introduction",
+  primaryButtonText: "Texte bouton principal",
+  primaryButtonLink: "Lien bouton principal",
+  secondaryButtonText: "Texte bouton secondaire",
+  secondaryButtonLink: "Lien bouton secondaire",
+  isPublished: "Publiee",
+  federationName: "Nom officiel",
+  shortName: "Acronyme",
+  logo: "Logo",
+  primaryColor: "Couleur principale",
+  secondaryColor: "Couleur secondaire",
+  accentColor: "Couleur accent",
+  slogan: "Slogan",
+  contactEmail: "Email de contact",
+  phone: "Telephone",
+  address: "Adresse",
+  footerText: "Texte de pied de page",
+  title: "Titre",
+  type: "Type",
+  shortDescription: "Description courte",
+  startDate: "Date de debut",
+  location: "Lieu",
+  city: "Ville",
+  mainPoster: "Affiche principale",
+  registrationEnabled: "Inscriptions ouvertes",
+  status: "Statut",
+  featuredOnHome: "Afficher en accueil",
+  summary: "Resume",
+  content: "Contenu",
+  mainImage: "Image principale",
+  category: "Categorie",
+  discipline: "Discipline",
+  rulesetName: "Nom du reglement",
+  durationSeconds: "Duree en secondes",
 };
 
 function Field({ name, value, onChange }) {
@@ -99,7 +155,7 @@ function Field({ name, value, onChange }) {
   if (isBool)
     return (
       <label className="form-row">
-        <span>{name}</span>
+        <span>{fieldLabels[name] || name}</span>
         <select
           value={String(value ?? false)}
           onChange={(e) => onChange(name, e.target.value === "true")}
@@ -117,7 +173,7 @@ function Field({ name, value, onChange }) {
   ].includes(name);
   return (
     <label className="form-row">
-      <span>{name}</span>
+      <span>{fieldLabels[name] || name}</span>
       {isLong ? (
         <textarea
           rows="4"
@@ -164,13 +220,34 @@ function Table({ rows }) {
 }
 function renderCell(value) {
   if (value == null) return "";
+  if (Array.isArray(value)) {
+    if (!value.length) return "0";
+
+    return value
+      .map((item) => readableValue(item))
+      .filter(Boolean)
+      .join(", ")
+      .slice(0, 120);
+  }
+  return readableValue(value);
+}
+
+function readableValue(value) {
+  if (value == null) return "";
   if (typeof value === "object") {
     // Common nested shapes for "latest registrations" (registration -> athlete/person)
     const athlete =
+      value.athleteId ||
       value.athlete ||
       value.registration?.athlete ||
+      value.registration?.athleteId ||
       value.player ||
       value.person;
+
+    const registrationName = [value.firstName, value.lastName]
+      .filter(Boolean)
+      .join(" ");
+    if (registrationName) return registrationName.slice(0, 120);
 
     if (athlete && typeof athlete === "object") {
       const fullName = athlete.fullName || athlete.name;
@@ -269,23 +346,25 @@ export default function AdminFederationModule({ module }) {
     <AdminLayout>
       <div className="page-head">
         <h1>{cfg.title}</h1>
-        <p>Module federal configurable, securise cote API.</p>
+        {cfg.description && <p>{cfg.description}</p>}
       </div>
       {message && <div className="notice">{message}</div>}
       {loading && <div className="notice">Chargement...</div>}
       {cfg.mode === "dashboard" && (
         <section className="grid cards">
-          {Object.entries(rows[0] || {}).map(([k, v]) => (
-            <div className="stat-card" key={k}>
-              <strong>{renderCell(v)}</strong>
-              <span>{k}</span>
-            </div>
-          ))}
+          {Object.entries(rows[0] || {})
+            .filter(([k]) => k !== "latestRegistrations")
+            .map(([k, v]) => (
+              <div className="stat-card" key={k}>
+                <strong>{renderCell(v)}</strong>
+                <span>{k}</span>
+              </div>
+            ))}
         </section>
       )}
       {cfg.mode === "settings" && (
         <section className="panel">
-          <h2>Configuration</h2>
+          <h2>{cfg.sectionTitle || "Configuration"}</h2>
           {cfg.fields.map((f) => (
             <Field key={f} name={f} value={form[f]} onChange={change} />
           ))}

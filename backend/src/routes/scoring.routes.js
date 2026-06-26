@@ -7,6 +7,7 @@ import Ranking from '../models/Ranking.js';
 import { protect, allowRoles } from '../middlewares/auth.middleware.js';
 import { audit } from '../utils/audit.js';
 import { applyScoringAction } from '../scoring/scoringEngine.js';
+import { advanceWinnerInBracket } from '../competition/bracketAdvancement.service.js';
 
 const router = Router();
 const roles = ['SUPER_ADMIN','FEDERATION_ADMIN','COMPETITION_MANAGER','REFEREE','TABLE_OPERATOR'];
@@ -66,6 +67,11 @@ router.patch('/sessions/:id/validate', protect, allowRoles('SUPER_ADMIN','FEDERA
     if (winnerId) {
       await Athlete.findByIdAndUpdate(winnerId, { $inc: { rankingPoints: 10 } });
       await Ranking.findOneAndUpdate({ athlete: winnerId, discipline: session.discipline, season: new Date().getFullYear(), ...scope(req) }, { $inc: { points: 10, wins: 1 }, $setOnInsert: { club: session.winnerSide === 'red' ? session.fight.redAthlete?.club : session.fight.blueAthlete?.club } }, { upsert: true });
+      try {
+        await advanceWinnerInBracket(session.fight._id, winnerId);
+      } catch (bracketErr) {
+        console.error('[Bracket Advancement] Failed to advance winner:', bracketErr);
+      }
     }
   }
   await audit({ actor: req.user._id, action: 'SCORING_RESULT_VALIDATED', entity: 'ScoringSession', entityId: session._id });

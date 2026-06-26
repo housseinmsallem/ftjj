@@ -9,6 +9,8 @@ import {
   formatNewazaGrade,
 } from "../utils/grades";
 
+const BASE_URL = "";
+
 const configs = {
   clubs: {
     title: "Gestion des clubs",
@@ -19,6 +21,14 @@ const configs = {
       { key: "president", label: "President" },
       { key: "email", label: "Email", type: "email" },
       { key: "phone", label: "Telephone" },
+      {
+        key: "logo",
+        label: "Logo",
+        type: "file",
+        render: (row) => (
+          <img src={`${BASE_URL}${row.logo}`} className="custom-club-style" />
+        ),
+      },
     ],
     columns: [
       ["name", "Club"],
@@ -37,6 +47,15 @@ const configs = {
       { key: "weight", label: "Poids", type: "number" },
       { key: "phone", label: "Telephone", type: "text" },
       { key: "city", label: "Ville", type: "text" },
+      { key: "birthDate", label: "Date de naissance", type: "date" },
+      {
+        key: "photo",
+        label: "Photo",
+        type: "file",
+        render: (row) => (
+          <img src={`${BASE_URL}${row.photo}`} className="custom-club-style" />
+        ),
+      },
       { key: "licenseNumber", label: "Numero licence", type: "text" },
       {
         key: "jiujitsuBelt",
@@ -76,22 +95,34 @@ const configs = {
       ["newazaGrade", "Grade Newaza"],
       ["rankingPoints", "Points"],
       ["licenseStatus", "Licence"],
+      ["photo", "Photo"],
     ],
   },
   coaches: {
     title: "Gestion des coachs",
     endpoint: "/coaches",
     fields: [
-      { key: "name", label: "Nom", type: "text", required: true },
+      { key: "firstName", label: "Prénom", type: "text", required: true },
+      { key: "lastName", label: "Nom", type: "text", required: true },
       { key: "email", label: "Email", type: "email" },
       { key: "phone", label: "Telephone", type: "text" },
       { key: "licenseNumber", label: "Numero licence", type: "text" },
       { key: "experienceYears", label: "Experience", type: "number" },
+      { key: "birthDate", label: "Date de naissance", type: "date" },
+
       {
         key: "licenseStatus",
         label: "Licence",
         type: "select",
         options: ["PENDING", "ACTIVE", "EXPIRED"],
+      },
+      {
+        key: "photo",
+        label: "Photo",
+        type: "file",
+        render: (row) => (
+          <img src={`${BASE_URL}${row.photo}`} className="custom-club-style" />
+        ),
       },
       {
         key: "certifications",
@@ -103,20 +134,25 @@ const configs = {
       { key: "bio", label: "Bio", type: "textarea", rows: 4 },
     ],
     columns: [
-      ["name", "Coach"],
+      ["firstName", "Prénom"],
+      ["lastName", "Nom"],
       ["experienceYears", "Annees"],
       ["licenseNumber", "Licence N"],
       ["licenseStatus", "Statut"],
+      ["birthDate", "Date de naissance"],
     ],
   },
   referees: {
     title: "Gestion des arbitres",
     endpoint: "/referees",
     fields: [
-      { key: "name", label: "Nom", type: "text", required: true },
+      { key: "firstName", label: "Prénom", type: "text", required: true },
+      { key: "lastName", label: "Nom", type: "text", required: true },
       { key: "email", label: "Email", type: "email" },
       { key: "phone", label: "Telephone", type: "text" },
       { key: "licenseNumber", label: "Numero licence", type: "text" },
+      { key: "birthDate", label: "Date de naissance", type: "date" },
+
       {
         key: "level",
         label: "Niveau",
@@ -135,13 +171,23 @@ const configs = {
         type: "textarea",
         rows: 4,
       },
+      {
+        key: "photo",
+        label: "Photo",
+        type: "file",
+        render: (row) => (
+          <img src={`${BASE_URL}${row.photo}`} className="custom-club-style" />
+        ),
+      },
       { key: "bio", label: "Bio", type: "textarea", rows: 4 },
     ],
     columns: [
-      ["name", "Arbitre"],
+      ["firstName", "Prénom"],
+      ["lastName", "Nom"],
       ["level", "Niveau"],
       ["availability", "Disponible"],
       ["licenseNumber", "Licence N"],
+      ["birthDate", "Date de naissance"],
     ],
   },
   competitions: {
@@ -315,23 +361,60 @@ function normalizeInitialValues(row = {}) {
 }
 
 function normalizeColumns(cols) {
-  return cols.map(([key, label]) => ({
-    key,
-    label,
-    render: (row) => {
-      if (key === "name")
-        return row.firstName ? `${row.firstName} ${row.lastName}` : row.name;
-      if (key === "technicalGrade") return formatAthleteTechnicalGrades(row);
-      if (key === "jiujitsuGrade") return formatJiuJitsuGrade(row);
-      if (key === "newazaGrade") return formatNewazaGrade(row);
-      if (key === "availability")
-        return row[key] === false || row[key] === "false" ? "Non" : "Oui";
-      if (key === "date" || key === "createdAt")
-        return row[key] ? new Date(row[key]).toLocaleDateString() : "";
-      if (Array.isArray(row[key])) return row[key].join(", ");
-      return row[key];
-    },
-  }));
+  return cols.map((col) => {
+    // 1. If it's a standard configuration array: [key, label]
+    let key, label, customRender;
+
+    if (Array.isArray(col)) {
+      [key, label] = col;
+    } else {
+      // 2. If it's an object configuration: { key, label, render }
+      key = col.key;
+      label = col.label;
+      customRender = col.render;
+    }
+
+    return {
+      key,
+      label,
+      render: (row, i) => {
+        // If a completely custom render function was provided in the object, use it!
+        if (customRender) return customRender(row, i);
+
+        // --- Catch image fields dynamically ---
+        if (key === "photo" || key === "logo") {
+          return row[key] ? (
+            <img
+              src={`${BASE_URL}${row[key]}`}
+              alt={key}
+              style={{
+                width: "45px",
+                height: "45px",
+                borderRadius: key === "photo" ? "50%" : "4px",
+                objectFit: "cover",
+              }}
+            />
+          ) : (
+            <span className="no-media">Aucun(e)</span>
+          );
+        }
+
+        // --- Your existing fallback rendering logic ---
+        if (key === "name")
+          return row.firstName ? `${row.firstName} ${row.lastName}` : row.name;
+        if (key === "technicalGrade") return formatAthleteTechnicalGrades(row);
+        if (key === "jiujitsuGrade") return formatJiuJitsuGrade(row);
+        if (key === "newazaGrade") return formatNewazaGrade(row);
+        if (key === "availability")
+          return row[key] === false || row[key] === "false" ? "Non" : "Oui";
+        if (key === "date" || key === "createdAt")
+          return row[key] ? new Date(row[key]).toLocaleDateString() : "";
+        if (Array.isArray(row[key])) return row[key].join(", ");
+
+        return row[key];
+      },
+    };
+  });
 }
 
 export default function AdminResourcePage({ type }) {
@@ -501,7 +584,12 @@ export default function AdminResourcePage({ type }) {
         </section>
       )}
 
-      <SmartTable title="Liste" rows={rows} columns={columns} />
+      <SmartTable
+        title="Liste"
+        rows={rows}
+        columns={columns}
+        showExportLicence={["athletes", "coaches", "referees"].includes(type)}
+      />
     </AdminLayout>
   );
 }

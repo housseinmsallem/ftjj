@@ -20,11 +20,11 @@ router.get('/home', async (req, res, next) => { try {
   const [slider, events, platformSettings, legacySettings] = await Promise.all([
     ContentBlock.find({ status:'PUBLISHED', displayOnHome:true }).sort({ displayOrder:1, startDate:1, createdAt:-1 }).limit(8),
     ContentBlock.find({ status:'PUBLISHED', displayOnHome:true, type: { $in:['EVENT','STAGE','CHAMPIONSHIP','NEWS','ANNOUNCEMENT'] } }).sort({ startDate:1, displayOrder:1, createdAt:-1 }).limit(12),
-    PlatformSettings.findOne().lean(),
-    FederationSettings.findOne().lean()
+    PlatformSettings.findOne().sort({ createdAt: 1 }).lean(),
+    FederationSettings.findOne().sort({ createdAt: 1 }).lean()
   ]);
   const settings = platformSettings || legacySettings;
-  const [homepage, news, publicEvents] = await Promise.all([HomePageSettings.findOne({ isPublished: true }).lean(), News.find({ status: 'published' }).sort({ publishedAt: -1, createdAt: -1 }).limit(6).lean(), Event.find({ status: 'published' }).sort({ startDate: 1 }).limit(8).lean()]);
+  const [homepage, news, publicEvents] = await Promise.all([HomePageSettings.findOne({ isPublished: true }).sort({ createdAt: 1 }).lean(), News.find({ status: 'published' }).sort({ publishedAt: -1, createdAt: -1 }).limit(6).lean(), Event.find({ status: 'published' }).sort({ startDate: 1 }).limit(8).lean()]);
   res.json({ slider, events: publicEvents.length ? publicEvents : events, settings, homepage, news });
 } catch(e){ next(e); }});
 router.get('/clubs', async (req, res, next) => { try { res.json(await Club.find({ affiliationStatus:'APPROVED' }).sort({ name:1 })); } catch(e){ next(e); }});

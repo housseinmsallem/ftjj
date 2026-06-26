@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
@@ -12,7 +12,6 @@ import ClubDashboard from "./pages/ClubDashboard";
 import AdminResourcePage from "./pages/AdminResourcePage";
 import AdminLiveScoring from "./pages/AdminLiveScoring";
 import AdminContentBuilder from "./pages/AdminContentBuilder";
-import AdminSettings from "./pages/AdminSettings";
 import AdminNotifications from "./pages/AdminNotifications";
 import AdminUploads from "./pages/AdminUploads";
 import PublicDirectory from "./pages/PublicDirectory";
@@ -84,7 +83,7 @@ export default function App() {
             <Route path="/en-direct" element={<Live />} />
             <Route path="/admin" element={admin(<FederationDashboard />)} />
 
-            <Route path="/events" element={<NewsPage />} />
+            {/* <Route path="/events" element={<NewsPage />} /> */}
             <Route
               path="/live/fight/:fightId/display"
               element={<PublicFightDisplay />}
@@ -94,16 +93,20 @@ export default function App() {
               element={admin(<AdminFederationModule module="dashboard" />)}
             />
             <Route
+              path="/admin/homepage"
+              element={admin(<AdminFederationModule module="homepage" />)}
+            />
+            <Route
               path="/admin/cms"
-              element={admin(<AdminFederationModule module="cms" />)}
+              element={admin(<Navigate to="/admin/homepage" replace />)}
             />
             <Route
               path="/admin/site-builder"
-              element={admin(<AdminFederationModule module="cms" />)}
+              element={admin(<Navigate to="/admin/homepage" replace />)}
             />
             <Route
               path="/admin/homepage-editor"
-              element={admin(<AdminFederationModule module="cms" />)}
+              element={admin(<Navigate to="/admin/homepage" replace />)}
             />
             <Route
               path="/admin/platform-settings"
@@ -213,7 +216,12 @@ export default function App() {
               path="/admin/audit"
               element={admin(<AdminResourcePage type="audit-logs" />)}
             />
-            <Route path="/admin/settings" element={admin(<AdminSettings />)} />
+            <Route
+              path="/admin/settings"
+              element={admin(
+                <Navigate to="/admin/platform-settings" replace />,
+              )}
+            />
             <Route
               path="/admin/notifications"
               element={admin(<AdminNotifications />)}

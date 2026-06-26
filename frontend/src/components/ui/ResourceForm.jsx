@@ -41,6 +41,18 @@ export default function ResourceForm({
       );
     }
 
+    if (field.type === "file") {
+      return (
+        <input
+          type="file"
+          // Crucial: Clear value string constraint for file inputs for security reasons.
+          // Instead, listen for the file object array allocation
+          onChange={(e) => change(field.key, e.target.files[0])}
+          required={field.required && !initialValues[field.key]} // Not required on edits if already exists
+        />
+      );
+    }
+
     return (
       <input
         type={field.type || "text"}
@@ -56,7 +68,29 @@ export default function ResourceForm({
       className="resource-form"
       onSubmit={async (e) => {
         e.preventDefault();
-        await onSubmit(form);
+
+        // ─── NEW: CONDITIONAL FORMDATA PROCESSING ──────────────────────────
+        // Check if any of the fields inside our form config is a file type
+        const hasFile = fields.some((f) => f.type === "file");
+
+        if (hasFile) {
+          const formData = new FormData();
+
+          // Append all fields to the FormData payload dynamically
+          Object.keys(form).forEach((key) => {
+            // Only append values that actually exist
+            if (form[key] !== undefined && form[key] !== null) {
+              formData.append(key, form[key]);
+            }
+          });
+
+          // Submit using the multi-part data payload instead of raw state object
+          await onSubmit(formData);
+        } else {
+          // If no files are needed, keep passing standard text payload object
+          await onSubmit(form);
+        }
+
         if (!onCancel) setForm({});
       }}
     >

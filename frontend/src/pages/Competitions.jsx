@@ -195,6 +195,14 @@ export default function Competitions() {
                       <span>
                         {normalizeStatus(competition.registrationStatus)}
                       </span>
+                      <div className="public-actions compact">
+                        <Link className="public-btn primary" to="/en-direct">
+                          Voir le live
+                        </Link>
+                        <Link className="public-btn ghost" to="/contact">
+                          Demander des informations
+                        </Link>
+                      </div>
                     </div>
                   </article>
                 ))}
