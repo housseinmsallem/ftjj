@@ -7,6 +7,7 @@ import Bracket from '../models/Bracket.js';
 import Fight from '../models/Fight.js';
 import Athlete from '../models/Athlete.js';
 import { protect, allowRoles } from '../middlewares/auth.middleware.js';
+import { requireMedicalCertificate, requireLicenseForRegistration } from '../middlewares/compliance.guard.js';
 import { audit } from '../utils/audit.js';
 import { buildOfficialCategories, enrichRegistrationFromAthlete, rederiveRegistrationCategories } from '../competition/categoryEngine.js';
 import { generateSingleEliminationBracket } from '../competition/bracketSeeding.service.js';
@@ -29,7 +30,7 @@ router.get('/:competitionId/registrations', protect, async (req, res) => {
   res.json(await CompetitionRegistration.find(query).populate('clubId athleteId submittedBy').sort({ createdAt: -1 }));
 });
 
-router.post('/:competitionId/registrations', protect, allowRoles('SUPER_ADMIN','FEDERATION_ADMIN','COMPETITION_MANAGER','CLUB_ADMIN','COACH'), async (req, res) => {
+router.post('/:competitionId/registrations', protect, allowRoles('SUPER_ADMIN','FEDERATION_ADMIN','COMPETITION_MANAGER','CLUB_ADMIN','COACH'), requireMedicalCertificate, requireLicenseForRegistration, async (req, res) => {
   let payload = { ...req.body, competitionId: req.params.competitionId, submittedBy: req.user._id, ...scope(req) };
   if (!payload.clubId && req.user.club) payload.clubId = req.user.club;
 
@@ -165,6 +166,76 @@ router.patch('/:competitionId/publish-brackets', protect, allowRoles(...adminRol
 
 router.get('/:competitionId/categories', protect, async (req, res) => res.json(await Category.find({ competitionId: req.params.competitionId, ...scope(req) }).sort('order')));
 router.get('/:competitionId/brackets', protect, async (req, res) => res.json(await Bracket.find({ competitionId: req.params.competitionId, ...scope(req) }).populate('categoryId seeds.athlete rounds.matches.redAthlete rounds.matches.blueAthlete').sort('createdAt')));
+
+// Update bracket match with fight ID
+router.patch('/brackets/:bracketId/matches/:matchId', protect, allowRoles(...adminRoles), async (req, res) => {
+  const bracket = await Bracket.findOne({ _id: req.params.bracketId, ...scope(req) });
+  if (!bracket) return res.status(404).json({ message: 'Arbre introuvable' });
+
+  // Find and update the specific match
+  let matchFound = false;
+  for (const round of bracket.rounds) {
+    const match = round.matches.find(m => String(m._id) === String(req.params.matchId) || m.matchNumber === parseInt(req.params.matchId));
+    if (match) {
+      Object.assign(match, req.body);
+      matchFound = true;
+      break;
+    }
+  }
+
+  if (!matchFound) return res.status(404).json({ message: 'Match introuvable dans l\'arbre' });
+
+  await bracket.save();
+  await audit({ actor: req.user._id, action: 'BRACKET_MATCH_UPDATED', entity: 'Bracket', entityId: bracket._id, metadata: { matchId: req.params.matchId, updates: req.body } });
+  res.json(bracket);
+});
+
+// Swap athletes in bracket seeds (manual adjustment)
+router.patch('/brackets/:bracketId/seeds/swap', protect, allowRoles(...adminRoles), async (req, res) => {
+  const { seedPosition1, seedPosition2 } = req.body;
+  const bracket = await Bracket.findOne({ _id: req.params.bracketId, ...scope(req) });
+  if (!bracket) return res.status(404).json({ message: 'Arbre introuvable' });
+
+  const seed1 = bracket.seeds.find(s => s.position === seedPosition1);
+  const seed2 = bracket.seeds.find(s => s.position === seedPosition2);
+
+  if (!seed1 || !seed2) return res.status(404).json({ message: 'Semences introuvables' });
+
+  // Swap athlete data
+  const tempAthlete = seed1.athlete;
+  const tempClub = seed1.club;
+  const tempRegistration = seed1.registration;
+
+  seed1.athlete = seed2.athlete;
+  seed1.club = seed2.club;
+  seed1.registration = seed2.registration;
+
+  seed2.athlete = tempAthlete;
+  seed2.club = tempClub;
+  seed2.registration = tempRegistration;
+
+  // Update matches in rounds to reflect the swap
+  for (const round of bracket.rounds) {
+    for (const match of round.matches) {
+      if (match.redSeed === seedPosition1) {
+        match.redAthlete = seed1.athlete;
+      } else if (match.redSeed === seedPosition2) {
+        match.redAthlete = seed2.athlete;
+      }
+      if (match.blueSeed === seedPosition1) {
+        match.blueAthlete = seed1.athlete;
+      } else if (match.blueSeed === seedPosition2) {
+        match.blueAthlete = seed2.athlete;
+      }
+    }
+  }
+
+  bracket.status = 'needs_review';
+  await bracket.save();
+  await audit({ actor: req.user._id, action: 'BRACKET_SEEDS_SWAPPED', entity: 'Bracket', entityId: bracket._id, metadata: { seedPosition1, seedPosition2 } });
+  res.json(bracket);
+});
+
 router.post('/:competitionId/brackets/send-to-live', protect, allowRoles(...adminRoles), async (req, res) => {
   const brackets = await Bracket.find({ competitionId: req.params.competitionId, ...scope(req) });
   for (const bracket of brackets) {

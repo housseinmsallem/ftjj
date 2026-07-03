@@ -60,4 +60,39 @@ export const adminApi = {
   stats: () => api.get("/dashboard/stats").then((r) => r.data),
   exportUrl: (resource) => `${api.defaults.baseURL}/exports/${resource}.csv`,
 };
+
+export const scoringApi = {
+  listSessions: (params) =>
+    api.get("/scoring/sessions", { params }).then((r) => r.data),
+  getSession: (id) => api.get(`/scoring/sessions/${id}`).then((r) => r.data),
+  createSession: (payload) =>
+    api.post("/scoring/sessions", payload).then((r) => r.data),
+  startSession: (id) =>
+    api.patch(`/scoring/sessions/${id}/start`).then((r) => r.data),
+  pauseSession: (id) =>
+    api.patch(`/scoring/sessions/${id}/pause`).then((r) => r.data),
+  resumeSession: (id) =>
+    api.patch(`/scoring/sessions/${id}/resume`).then((r) => r.data),
+  doctorTime: (id) =>
+    api.patch(`/scoring/sessions/${id}/doctor-time`).then((r) => r.data),
+  waitingTime: (id) =>
+    api.patch(`/scoring/sessions/${id}/waiting-time`).then((r) => r.data),
+  sendAction: (id, payload) =>
+    api.patch(`/scoring/sessions/${id}/action`, payload).then((r) => r.data),
+  finishSession: (id, payload) =>
+    api.patch(`/scoring/sessions/${id}/finish`, payload).then((r) => r.data),
+  validateSession: (id) =>
+    api.patch(`/scoring/sessions/${id}/validate`).then((r) => r.data),
+  undoAction: (id) =>
+    api.patch(`/scoring/sessions/${id}/undo`).then((r) => r.data),
+  getRuleset: (discipline) =>
+    api.get(`/scoring/rulesets/${discipline}`).then((r) => r.data),
+  getPublicSession: (id) =>
+    api.get(`/scoring/sessions/${id}/public`).then((r) => r.data),
+  getPublicSessionByFight: (fightId) =>
+    api.get(`/scoring/fight/${fightId}/public`).then((r) => r.data),
+  listPublicSessions: (params) =>
+    api.get("/scoring/public/sessions", { params }).then((r) => r.data),
+};
+
 export default api;

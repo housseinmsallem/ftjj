@@ -11,7 +11,16 @@ const clubSchema = new mongoose.Schema({
   logo:{ type: String, required: false},
   affiliationStatus: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'], default: 'PENDING' },
   licenseYear: { type: Number, default: new Date().getFullYear() },
-  documents: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Document' }]
+  documents: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Document' }],
+  federalId: { type: String, unique: true, index: { sparse: true } },
+  legalRepresentative: String,
+  affiliationSeason: { type: String, default: () => String(new Date().getFullYear()) },
+  affiliationDocumentsStatus: { type: String, enum: ['INCOMPLETE', 'PENDING_REVIEW', 'VALIDATED', 'REJECTED'], default: 'INCOMPLETE' },
+  affiliationValidatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  affiliationValidatedAt: Date,
+  portalAccessCreatedAt: Date,
+  portalAccessSentAt: Date,
+  rejectionReason: String
 }, { timestamps: true });
 
 export default mongoose.model('Club', clubSchema);

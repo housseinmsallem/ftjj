@@ -1,18 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import api from "../../services/api";
+import BracketTree from "../../components/competitions/BracketTree";
+import LiveMatch from "../../components/competitions/LiveMatch";
+
+const TABS = ["registrations", "brackets", "fights"];
 
 export default function AdminCompetitionOperations() {
   const navigate = useNavigate();
 
-  // State
   const [competitions, setCompetitions] = useState([]);
   const [competitionId, setCompetitionId] = useState("");
   const [activeTab, setActiveTab] = useState("registrations");
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  // Loaded Details
   const [registrations, setRegistrations] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brackets, setBrackets] = useState([]);
@@ -20,14 +22,15 @@ export default function AdminCompetitionOperations() {
   const [sessions, setSessions] = useState([]);
   const [athletes, setAthletes] = useState([]);
 
-  // Selections
   const [selectedAthleteId, setSelectedAthleteId] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState("NEWAZA");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
 
+  const [liveMatchFight, setLiveMatchFight] = useState(null);
   const [message, setMessage] = useState("");
 
-  async function load() {
+  // ---- Data loading ----
+  const loadCompetitions = useCallback(async () => {
     try {
       const { data } = await api.get("/competitions");
       const list = Array.isArray(data) ? data : data.data || [];
@@ -35,13 +38,12 @@ export default function AdminCompetitionOperations() {
       if (!competitionId && list[0]?._id) {
         setCompetitionId(list[0]._id);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setMessage("Impossible de charger les compétitions");
     }
-  }
+  }, []);
 
-  async function loadDetails(id = competitionId) {
+  const loadDetails = useCallback(async (id) => {
     if (!id) return;
     setLoadingDetails(true);
     try {
@@ -58,44 +60,47 @@ export default function AdminCompetitionOperations() {
       setCategories(c.data || []);
       setBrackets(b.data || []);
 
-      const compFights = (Array.isArray(f.data) ? f.data : f.data.data || []).filter(
-        (fight) => String(fight.competition?._id || fight.competition) === String(id)
+      const allFights = Array.isArray(f.data) ? f.data : f.data?.data || [];
+      const compFights = allFights.filter(
+        (fight) =>
+          String(fight.competition?._id || fight.competition) === String(id),
       );
       setFights(compFights);
-      setSessions(Array.isArray(s.data) ? s.data : s.data.data || []);
-      setAthletes(Array.isArray(ath.data) ? ath.data : ath.data.data || []);
+      setSessions(Array.isArray(s.data) ? s.data : s.data?.data || []);
+      setAthletes(Array.isArray(ath.data) ? ath.data : ath.data?.data || []);
 
-      // Default select the first category if none is selected
-      if (c.data && c.data[0]?._id && !selectedCategoryId) {
-        setSelectedCategoryId(c.data[0]._id);
+      // Auto-select first category
+      const cats = c.data || [];
+      if (cats[0]?._id && !selectedCategoryId) {
+        setSelectedCategoryId(cats[0]._id);
       }
-    } catch (err) {
-      console.error(err);
-      setMessage("Erreur lors du chargement des détails de la compétition");
+    } catch {
+      setMessage("Erreur lors du chargement des détails");
     } finally {
       setLoadingDetails(false);
     }
-  }
-
-  useEffect(() => {
-    load();
   }, []);
 
   useEffect(() => {
-    loadDetails();
-  }, [competitionId]);
+    loadCompetitions();
+  }, [loadCompetitions]);
+  useEffect(() => {
+    loadDetails(competitionId);
+  }, [competitionId]); // eslint-disable-line
 
-  async function runWorkflowAction(label, path, method = "post") {
+  // ---- Workflow actions ----
+  const runAction = async (label, path, method = "post") => {
     try {
       await api[method](path);
-      setMessage(`${label} effectuée avec succès`);
-      await loadDetails();
-    } catch (error) {
-      setMessage(error.response?.data?.message || `${label} impossible`);
+      setMessage(`${label} — succès`);
+      await loadDetails(competitionId);
+    } catch (err) {
+      setMessage(err.response?.data?.message || `${label} — échec`);
     }
-  }
+  };
 
-  async function handleRegisterAthlete(e) {
+  // ---- Registration actions ----
+  const registerAthlete = async (e) => {
     e.preventDefault();
     if (!selectedAthleteId) return;
     try {
@@ -103,70 +108,162 @@ export default function AdminCompetitionOperations() {
         athleteId: selectedAthleteId,
         discipline: selectedDiscipline,
       });
-      setMessage("Athlète inscrit avec succès");
+      setMessage("Athlète inscrit");
       setSelectedAthleteId("");
-      await loadDetails();
+      await loadDetails(competitionId);
     } catch (err) {
       setMessage(err.response?.data?.message || "Inscription impossible");
     }
-  }
+  };
 
-  async function approveRegistration(regId) {
-    try {
-      await api.patch(`/competitions/registrations/${regId}/approve`);
-      setMessage("Inscription approuvée");
-      await loadDetails();
-    } catch (err) {
-      setMessage(err.response?.data?.message || "Approbation impossible");
-    }
-  }
+  const approveReg = async (id) => {
+    await api.patch(`/competitions/registrations/${id}/approve`);
+    await loadDetails(competitionId);
+  };
+  const rejectReg = async (id) => {
+    const c = prompt("Motif du rejet (facultatif) :");
+    await api.patch(`/competitions/registrations/${id}/reject`, { comment: c });
+    await loadDetails(competitionId);
+  };
 
-  async function rejectRegistration(regId) {
-    const comment = prompt("Motif du rejet (facultatif) :");
+  // ---- Live match from bracket ----
+  const startLiveMatch = async (match) => {
     try {
-      await api.patch(`/competitions/registrations/${regId}/reject`, { comment });
-      setMessage("Inscription rejetée");
-      await loadDetails();
-    } catch (err) {
-      setMessage(err.response?.data?.message || "Rejet impossible");
-    }
-  }
+      let fight = match.fight
+        ? fights.find((f) => String(f._id) === String(match.fight))
+        : null;
 
-  async function startScoring(fightId, discipline = "NEWAZA") {
-    try {
-      let session = sessions.find(
-        (s) => String(s.fight?._id || s.fight) === String(fightId)
-      );
-      if (!session) {
-        const { data } = await api.post("/scoring/sessions", {
-          fightId,
-          discipline,
+      if (!fight) {
+        // Create a Fight document
+        const { data } = await api.post("/fights", {
+          federation: competitions.find((c) => c._id === competitionId)
+            ?.federation,
+          competition: competitionId,
+          category: selectedBracket?.name || "",
+          redAthlete: match.redAthlete?._id || match.redAthlete,
+          blueAthlete: match.blueAthlete?._id || match.blueAthlete,
+          mat: "Tatami 1",
+          status: "SCHEDULED",
+          timerSeconds: 300,
         });
-        session = data;
-      }
-      navigate(`/admin/scoring/${session._id}`);
-    } catch (err) {
-      setMessage(err.response?.data?.message || "Impossible de démarrer l'arbitrage");
-    }
-  }
+        fight = data;
 
+        // Link fight to bracket match
+        try {
+          await api.patch(
+            `/competitions/brackets/${selectedBracket?._id}/matches/${match._id || match.matchNumber}`,
+            { fight: fight._id },
+          );
+        } catch {
+          /* best-effort */
+        }
+
+        // Refresh fights
+        const { data: fData } = await api.get("/fights");
+        const fresh = Array.isArray(fData) ? fData : fData?.data || [];
+        setFights(
+          fresh.filter(
+            (f) =>
+              String(f.competition?._id || f.competition) ===
+              String(competitionId),
+          ),
+        );
+      }
+
+      setLiveMatchFight(fight);
+    } catch (err) {
+      setMessage(
+        err.response?.data?.message || "Impossible de démarrer le match",
+      );
+    }
+  };
+
+  const handleMatchClick = (match) => {
+    const fight = fights.find((f) => String(f._id) === String(match.fight));
+    if (fight) {
+      setLiveMatchFight(fight);
+    }
+  };
+
+  const handleScoreUpdate = (data) => {
+    setFights((prev) =>
+      prev.map((f) =>
+        String(f._id) === String(data.fightId)
+          ? { ...f, redScore: data.redScore, blueScore: data.blueScore }
+          : f,
+      ),
+    );
+  };
+
+  const reloadBrackets = async () => {
+    try {
+      const { data } = await api.get(`/competitions/${competitionId}/brackets`);
+      setBrackets(Array.isArray(data) ? data : data.data || []);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // ---- Derived ----
   const selectedBracket = brackets.find(
-    (b) => String(b.categoryId?._id || b.categoryId) === String(selectedCategoryId)
+    (b) =>
+      String(b.categoryId?._id || b.categoryId) === String(selectedCategoryId),
   );
 
+  const tabConfig = [
+    {
+      key: "registrations",
+      label: "Inscriptions",
+      count: registrations.length,
+    },
+    { key: "brackets", label: "Arbres & Catégories", count: brackets.length },
+    { key: "fights", label: "Arbitrage & Combats", count: fights.length },
+  ];
+
+  // ---- Status labels ----
+  const regStatusLabel = (s) =>
+    s === "approved" ? "Validé" : s === "rejected" ? "Rejeté" : "En attente";
+  const fightStatusLabel = (s) =>
+    s === "SCHEDULED"
+      ? "Planifié"
+      : s === "LIVE"
+        ? "En Cours"
+        : s === "FINISHED"
+          ? "Terminé"
+          : s;
+
+  // =============================================================================
+  //  RENDER
+  // =============================================================================
   return (
     <AdminLayout>
       <div className="page-head">
         <h1>Opérations Compétition</h1>
-        <p>Gérer les inscriptions, générer les arbres et lancer les combats en direct.</p>
+        <p>Inscriptions, génération des arbres et arbitrage en direct.</p>
       </div>
 
-      {message && <div className="notice">{message}</div>}
+      {message && (
+        <div className="notice" style={{ marginBottom: "1rem" }}>
+          {message}
+          <button className="notice-close" onClick={() => setMessage("")}>
+            ×
+          </button>
+        </div>
+      )}
 
-      {/* Select Competition Header Panel */}
-      <section className="panel">
-        <label className="form-row">
-          <span>Sélectionner la compétition</span>
+      {/* ---- Competition selector ---- */}
+      <section
+        className="card"
+        style={{
+          marginBottom: "1.25rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <label className="form-row" style={{ flex: "1 1 300px" }}>
+          <span>Compétition</span>
           <select
             value={competitionId}
             onChange={(e) => {
@@ -181,414 +278,492 @@ export default function AdminCompetitionOperations() {
             ))}
           </select>
         </label>
+        <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+          {categories.length} catégorie(s) · {fights.length} combat(s) ·{" "}
+          {registrations.length} inscription(s)
+        </span>
       </section>
 
-      {/* Navigation Tabs */}
-      <div className="table-row-actions" style={{ marginBottom: "1.5rem" }}>
-        <button
-          className={activeTab === "registrations" ? "primary" : "ghost"}
-          onClick={() => setActiveTab("registrations")}
-        >
-          Inscriptions ({registrations.length})
-        </button>
-        <button
-          className={activeTab === "brackets" ? "primary" : "ghost"}
-          onClick={() => setActiveTab("brackets")}
-        >
-          Arbres & Catégories ({brackets.length})
-        </button>
-        <button
-          className={activeTab === "fights" ? "primary" : "ghost"}
-          onClick={() => setActiveTab("fights")}
-        >
-          Arbitrage & Combats ({fights.length})
-        </button>
+      {/* ---- Tabs ---- */}
+      <div
+        className="tabs-bar"
+        style={{ marginBottom: "1.25rem", display: "flex", gap: "0" }}
+      >
+        {tabConfig.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            style={{
+              flex: 1,
+              textAlign: "center",
+              padding: "0.75rem 1rem",
+              border: "none",
+              borderBottom:
+                activeTab === t.key
+                  ? "3px solid var(--accent)"
+                  : "3px solid transparent",
+              background:
+                activeTab === t.key ? "var(--panel-bg)" : "transparent",
+              color:
+                activeTab === t.key
+                  ? "var(--text-primary)"
+                  : "var(--text-muted)",
+              fontWeight: activeTab === t.key ? 700 : 500,
+              fontSize: "0.95rem",
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            {t.label} ({t.count})
+          </button>
+        ))}
       </div>
 
       {loadingDetails ? (
-        <div className="panel" style={{ textAlign: "center" }}>
+        <div className="card" style={{ textAlign: "center", padding: "3rem" }}>
           Chargement des détails...
         </div>
       ) : (
         <>
-          {/* TAB 1: REGISTRATIONS */}
+          {/* ======== TAB: REGISTRATIONS ======== */}
           {activeTab === "registrations" && (
-            <div className="grid two">
-              {/* Form to Register Athlete */}
-              <section className="panel">
-                <h2>Inscrire un athlète</h2>
-                <form onSubmit={handleRegisterAthlete} className="resource-form">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 2fr",
+                gap: "1.25rem",
+                alignItems: "start",
+              }}
+            >
+              <div className="card">
+                <h2 style={{ marginBottom: "1rem" }}>Inscrire un athlète</h2>
+                <form
+                  onSubmit={registerAthlete}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.75rem",
+                  }}
+                >
                   <label>
-                    Athlète
+                    <span
+                      style={{
+                        display: "block",
+                        marginBottom: "0.3rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Athlète
+                    </span>
                     <select
                       value={selectedAthleteId}
                       onChange={(e) => setSelectedAthleteId(e.target.value)}
                       required
+                      style={{ width: "100%" }}
                     >
-                      <option value="">Sélectionner un athlète</option>
+                      <option value="">Sélectionner...</option>
                       {athletes.map((a) => (
                         <option key={a._id} value={a._id}>
-                          {a.firstName} {a.lastName} ({a.club?.name || "Sans club"})
+                          {a.firstName} {a.lastName} (
+                          {a.club?.name || "Sans club"})
                         </option>
                       ))}
                     </select>
                   </label>
                   <label>
-                    Discipline
+                    <span
+                      style={{
+                        display: "block",
+                        marginBottom: "0.3rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Discipline
+                    </span>
                     <select
                       value={selectedDiscipline}
                       onChange={(e) => setSelectedDiscipline(e.target.value)}
-                      required
+                      style={{ width: "100%" }}
                     >
                       <option value="NEWAZA">Newaza</option>
                       <option value="FIGHTING">Fighting</option>
+                      <option value="FULL_CONTACT">Full Contact</option>
+                      <option value="DUO">Duo System</option>
                     </select>
                   </label>
-                  <button className="primary" type="submit" style={{ marginTop: "1rem" }}>
+                  <button type="submit" className="primary">
                     Inscrire l'athlète
                   </button>
                 </form>
-              </section>
+              </div>
 
-              {/* Registrations List */}
-              <section className="panel" style={{ gridColumn: "span 2" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-                  <h2>Inscriptions de la compétition</h2>
+              <div className="card">
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "1rem",
+                  }}
+                >
+                  <h2>Inscriptions ({registrations.length})</h2>
                   <button
                     onClick={() =>
-                      runWorkflowAction(
+                      runAction(
                         "Validation globale",
-                        `/competitions/${competitionId}/registrations/validate-all`
+                        `/competitions/${competitionId}/registrations/validate-all`,
                       )
                     }
                   >
-                    Valider toutes les inscriptions
+                    Valider tout
                   </button>
                 </div>
-                <div className="table-wrap">
-                  <table className="smart-table">
-                    <thead>
-                      <tr>
-                        <th>Athlète</th>
-                        <th>Club</th>
-                        <th>Discipline</th>
-                        <th>Catégorie d'âge</th>
-                        <th>Catégorie de poids</th>
-                        <th>Statut</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {registrations.length === 0 ? (
+                {registrations.length === 0 ? (
+                  <p className="muted">Aucune inscription.</p>
+                ) : (
+                  <div className="table-wrap">
+                    <table className="smart-table">
+                      <thead>
                         <tr>
-                          <td colSpan="7" style={{ textAlign: "center" }}>
-                            Aucune inscription trouvée.
-                          </td>
+                          <th>Athlète</th>
+                          <th>Club</th>
+                          <th>Discipline</th>
+                          <th>Âge</th>
+                          <th>Poids</th>
+                          <th>Statut</th>
+                          <th></th>
                         </tr>
-                      ) : (
-                        registrations.map((reg) => (
+                      </thead>
+                      <tbody>
+                        {registrations.map((reg) => (
                           <tr key={reg._id}>
                             <td>
-                              {reg.athleteId?.firstName} {reg.athleteId?.lastName}
+                              {reg.athleteId?.firstName}{" "}
+                              {reg.athleteId?.lastName}
                             </td>
-                            <td>{reg.clubId?.name || "Sans Club"}</td>
+                            <td>{reg.clubId?.name || "—"}</td>
                             <td>{reg.discipline}</td>
-                            <td>{reg.ageCategory || "N/A"}</td>
-                            <td>{reg.weightCategory || "N/A"}</td>
+                            <td>{reg.ageCategory || "—"}</td>
+                            <td>{reg.weightCategory || "—"}</td>
                             <td>
                               <span className={`badge ${reg.status}`}>
-                                {reg.status === "approved"
-                                  ? "Validé"
-                                  : reg.status === "rejected"
-                                  ? "Rejeté"
-                                  : "En attente"}
+                                {regStatusLabel(reg.status)}
                               </span>
                             </td>
                             <td>
-                              <div className="table-row-actions">
+                              <div style={{ display: "flex", gap: "0.35rem" }}>
                                 {reg.status !== "approved" && (
                                   <button
-                                    className="primary"
-                                    onClick={() => approveRegistration(reg._id)}
+                                    className="primary sm"
+                                    onClick={() => approveReg(reg._id)}
                                   >
-                                    Approuver
+                                    ✓
                                   </button>
                                 )}
                                 {reg.status !== "rejected" && (
                                   <button
-                                    className="ghost danger"
-                                    onClick={() => rejectRegistration(reg._id)}
+                                    className="ghost danger sm"
+                                    onClick={() => rejectReg(reg._id)}
                                   >
-                                    Rejeter
+                                    ✕
                                   </button>
                                 )}
                               </div>
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {/* TAB 2: BRACKETS */}
+          {/* ======== TAB: BRACKETS ======== */}
           {activeTab === "brackets" && (
-            <div className="grid three">
-              {/* Category Generation Rule Actions */}
-              <section className="panel" style={{ gridColumn: "span 3" }}>
-                <h2>Génération des Catégories & Arbres</h2>
-                <p style={{ marginBottom: "1rem" }}>
-                  Générez les catégories officielles d'abord, puis seeding les combattants dans les arbres (Brackets).
+            <div>
+              {/* Workflow controls */}
+              <div className="card" style={{ marginBottom: "1.25rem" }}>
+                <h2 style={{ marginBottom: "0.75rem" }}>
+                  Génération des Arbres
+                </h2>
+                <p className="muted" style={{ marginBottom: "0.75rem" }}>
+                  Étape 1 : Générer les catégories → Étape 2 : Générer les
+                  arbres → Étape 3 : Verrouiller → Étape 4 : Publier
                 </p>
-                <div className="table-row-actions">
+                <div
+                  style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}
+                >
                   <button
                     onClick={() =>
-                      runWorkflowAction(
-                        "Génération des catégories",
-                        `/competitions/${competitionId}/generate-categories`
+                      runAction(
+                        "Catégories",
+                        `/competitions/${competitionId}/generate-categories`,
                       )
                     }
                   >
-                    Générer les catégories
+                    ① Générer les catégories
                   </button>
                   <button
                     onClick={() =>
-                      runWorkflowAction(
-                        "Génération des arbres (brackets)",
-                        `/competitions/${competitionId}/generate-brackets`
+                      runAction(
+                        "Arbres",
+                        `/competitions/${competitionId}/generate-brackets`,
                       )
                     }
                   >
-                    Générer les arbres (brackets)
+                    ② Générer les arbres
                   </button>
                   <button
                     onClick={() =>
-                      runWorkflowAction(
-                        "Verrouillage des arbres",
+                      runAction(
+                        "Verrouillage",
                         `/competitions/${competitionId}/lock-brackets`,
-                        "patch"
+                        "patch",
                       )
                     }
                   >
-                    Verrouiller les arbres
+                    ③ Verrouiller
                   </button>
                   <button
                     onClick={() =>
-                      runWorkflowAction(
-                        "Publication des arbres",
+                      runAction(
+                        "Publication",
                         `/competitions/${competitionId}/publish-brackets`,
-                        "patch"
+                        "patch",
                       )
                     }
                   >
-                    Publier les arbres
+                    ④ Publier
+                  </button>
+                  <button
+                    onClick={() =>
+                      runAction(
+                        "Envoi au live",
+                        `/competitions/${competitionId}/brackets/send-to-live`,
+                      )
+                    }
+                  >
+                    ▶ Envoyer au direct
                   </button>
                 </div>
-              </section>
+              </div>
 
-              {/* Categories Selector Panel */}
-              <section className="panel">
-                <h2>Catégories</h2>
-                {categories.length === 0 ? (
-                  <p>Aucune catégorie générée.</p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    {categories.map((c) => (
-                      <button
-                        key={c._id}
-                        className={String(c._id) === String(selectedCategoryId) ? "primary" : "ghost"}
-                        onClick={() => setSelectedCategoryId(c._id)}
-                        style={{ textAlign: "left", width: "100%" }}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* Interactive Bracket Tree Renderer */}
-              <section className="panel" style={{ gridColumn: "span 2" }}>
-                <h2>Arbre de combat: {selectedBracket?.name || "Aucun"}</h2>
-                {selectedBracket ? (
-                  <div className="bracket-wrapper" style={{ overflowX: "auto", padding: "1rem" }}>
-                    <div style={{ display: "flex", gap: "2rem" }}>
-                      {selectedBracket.rounds?.map((round, rIndex) => (
-                        <div
-                          key={round._id || rIndex}
+              {/* Category selector + Bracket tree */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "220px 1fr",
+                  gap: "1.25rem",
+                  alignItems: "start",
+                }}
+              >
+                <div className="card">
+                  <h3 style={{ marginBottom: "0.75rem" }}>Catégories</h3>
+                  {categories.length === 0 ? (
+                    <p className="muted">Aucune catégorie.</p>
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.35rem",
+                      }}
+                    >
+                      {categories.map((c) => (
+                        <button
+                          key={c._id}
+                          onClick={() => setSelectedCategoryId(c._id)}
+                          className={
+                            String(c._id) === String(selectedCategoryId)
+                              ? "primary"
+                              : "ghost"
+                          }
                           style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            justifyContent: "space-around",
-                            gap: "1.5rem",
-                            minWidth: "220px",
+                            textAlign: "left",
+                            justifyContent: "flex-start",
+                            padding: "0.5rem 0.75rem",
                           }}
                         >
-                          <h3 style={{ textAlign: "center", borderBottom: "1px solid #ccc" }}>
-                            Round {round.round}
-                          </h3>
-                          {round.matches?.map((match) => {
-                            const redName = match.redAthlete
-                              ? `${match.redAthlete.firstName || ""} ${match.redAthlete.lastName || ""}`
-                              : match.redSeed
-                              ? `Semence #${match.redSeed}`
-                              : "En attente";
-                            const blueName = match.blueAthlete
-                              ? `${match.blueAthlete.firstName || ""} ${match.blueAthlete.lastName || ""}`
-                              : match.blueSeed
-                              ? `Semence #${match.blueSeed}`
-                              : "En attente";
-
-                            const isFinished = match.winnerSeed !== null;
-                            const isLive = match.fight && fights.find((f) => String(f._id) === String(match.fight))?.status === "LIVE";
-
-                            return (
-                              <div
-                                key={match._id || match.matchNumber}
-                                style={{
-                                  border: "1px solid var(--border)",
-                                  borderRadius: "6px",
-                                  padding: "0.5rem",
-                                  backgroundColor: "var(--panel-bg)",
-                                  boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                                }}
-                              >
-                                <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
-                                  Match #{match.matchNumber} {isLive && <span className="badge LIVE">LIVE</span>}
-                                </div>
-                                <div
-                                  style={{
-                                    padding: "0.25rem 0.5rem",
-                                    backgroundColor: match.winnerSeed === match.redSeed ? "rgba(40,167,69,0.1)" : "transparent",
-                                    fontWeight: match.winnerSeed === match.redSeed ? "bold" : "normal",
-                                    borderRadius: "4px",
-                                  }}
-                                >
-                                  🔴 {redName}
-                                </div>
-                                <div style={{ margin: "0.25rem 0", borderTop: "1px dashed var(--border)" }} />
-                                <div
-                                  style={{
-                                    padding: "0.25rem 0.5rem",
-                                    backgroundColor: match.winnerSeed === match.blueSeed ? "rgba(40,167,69,0.1)" : "transparent",
-                                    fontWeight: match.winnerSeed === match.blueSeed ? "bold" : "normal",
-                                    borderRadius: "4px",
-                                  }}
-                                >
-                                  🔵 {blueName}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                          <span
+                            style={{ fontSize: "0.85rem", lineHeight: 1.3 }}
+                          >
+                            {c.name}
+                          </span>
+                        </button>
                       ))}
                     </div>
-                  </div>
-                ) : (
-                  <p>Aucun arbre généré pour cette catégorie.</p>
-                )}
-              </section>
+                  )}
+                </div>
+
+                <div className="card" style={{ overflow: "hidden" }}>
+                  <h2 style={{ marginBottom: "0.75rem" }}>
+                    {selectedBracket
+                      ? `Arbre : ${selectedBracket.name}`
+                      : "Aucun arbre sélectionné"}
+                    {selectedBracket?.status && (
+                      <span
+                        className={`badge ${selectedBracket.status}`}
+                        style={{ marginLeft: "0.75rem", fontSize: "0.75rem" }}
+                      >
+                        {selectedBracket.status}
+                      </span>
+                    )}
+                  </h2>
+                  <BracketTree
+                    bracket={selectedBracket}
+                    fights={fights}
+                    onMatchClick={handleMatchClick}
+                    onStartMatch={startLiveMatch}
+                    onBracketUpdate={reloadBrackets}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
-          {/* TAB 3: FIGHTS & LIVE SCORING CONTROL */}
+          {/* ======== TAB: FIGHTS ======== */}
           {activeTab === "fights" && (
-            <section className="panel">
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-                <h2>Tableau d'Arbitrage</h2>
+            <div className="card">
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "1rem",
+                }}
+              >
+                <h2>Tableau d'Arbitrage ({fights.length})</h2>
                 <button
                   onClick={() =>
-                    runWorkflowAction(
+                    runAction(
                       "Envoi au live",
-                      `/competitions/${competitionId}/brackets/send-to-live`
+                      `/competitions/${competitionId}/brackets/send-to-live`,
                     )
                   }
                 >
-                  Envoyer les combats au direct
+                  ▶ Envoyer les combats au direct
                 </button>
               </div>
 
-              <div className="table-wrap">
-                <table className="smart-table">
-                  <thead>
-                    <tr>
-                      <th>Catégorie</th>
-                      <th>Combattant Rouge</th>
-                      <th>Combattant Bleu</th>
-                      <th>Aire de combat</th>
-                      <th>Statut</th>
-                      <th>Arbitrage</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fights.length === 0 ? (
+              {fights.length === 0 ? (
+                <p
+                  className="muted"
+                  style={{ textAlign: "center", padding: "2rem" }}
+                >
+                  Aucun combat. Générez les arbres puis cliquez "Envoyer au
+                  direct".
+                </p>
+              ) : (
+                <div className="table-wrap">
+                  <table className="smart-table">
+                    <thead>
                       <tr>
-                        <td colSpan="6" style={{ textAlign: "center" }}>
-                          Aucun combat en cours ou planifié. Veuillez envoyer les arbres au direct.
-                        </td>
+                        <th>Catégorie</th>
+                        <th>🔴 Rouge</th>
+                        <th>🔵 Bleu</th>
+                        <th>Tatami</th>
+                        <th>Score</th>
+                        <th>Statut</th>
+                        <th>Action</th>
                       </tr>
-                    ) : (
-                      fights.map((fight) => {
+                    </thead>
+                    <tbody>
+                      {fights.map((fight) => {
                         const redName = fight.redAthlete
-                          ? `${fight.redAthlete.firstName} ${fight.redAthlete.lastName}`
+                          ? `${fight.redAthlete.firstName || ""} ${fight.redAthlete.lastName || ""}`.trim()
                           : "Qualifié";
                         const blueName = fight.blueAthlete
-                          ? `${fight.blueAthlete.firstName} ${fight.blueAthlete.lastName}`
+                          ? `${fight.blueAthlete.firstName || ""} ${fight.blueAthlete.lastName || ""}`.trim()
                           : "Qualifié";
+                        const isLive = fight.status === "LIVE";
+                        const isFinished = fight.status === "FINISHED";
+                        const isScheduled = fight.status === "SCHEDULED";
 
                         return (
-                          <tr key={fight._id}>
-                            <td>{fight.category}</td>
+                          <tr
+                            key={fight._id}
+                            style={{
+                              background: isLive
+                                ? "rgba(239,68,68,0.06)"
+                                : "transparent",
+                            }}
+                          >
+                            <td>{fight.category || "—"}</td>
                             <td>🔴 {redName}</td>
                             <td>🔵 {blueName}</td>
                             <td>{fight.mat || "Tatami 1"}</td>
                             <td>
-                              <span className={`badge ${fight.status}`}>
-                                {fight.status === "SCHEDULED"
-                                  ? "Planifié"
-                                  : fight.status === "LIVE"
-                                  ? "En Cours"
-                                  : "Terminé"}
+                              <span
+                                style={{
+                                  fontFamily: "monospace",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {fight.redScore ?? 0} — {fight.blueScore ?? 0}
                               </span>
                             </td>
                             <td>
-                              <div className="table-row-actions">
-                                {fight.status === "SCHEDULED" && (
-                                  <button
-                                    className="primary"
-                                    onClick={() => startScoring(fight._id, "NEWAZA")}
+                              <span
+                                className={`badge ${fight.status?.toLowerCase()}`}
+                              >
+                                {fightStatusLabel(fight.status)}
+                                {isLive && (
+                                  <span
+                                    style={{
+                                      marginLeft: "4px",
+                                      animation: "pulse 1.5s infinite",
+                                    }}
                                   >
-                                    Lancer l'Arbitrage
-                                  </button>
-                                )}
-                                {fight.status === "LIVE" && (
-                                  <button
-                                    className="primary"
-                                    onClick={() => startScoring(fight._id, "NEWAZA")}
-                                  >
-                                    Continuer l'Arbitrage
-                                  </button>
-                                )}
-                                {fight.status === "FINISHED" && (
-                                  <span style={{ fontSize: "0.9rem", fontWeight: "bold" }}>
-                                    Score: {fight.redScore ?? 0} - {fight.blueScore ?? 0}
+                                    ●
                                   </span>
                                 )}
-                              </div>
+                              </span>
+                            </td>
+                            <td>
+                              {(isScheduled || isLive) && (
+                                <button
+                                  className="primary sm"
+                                  onClick={() => setLiveMatchFight(fight)}
+                                >
+                                  {isLive ? "Arbitrer" : "Démarrer"}
+                                </button>
+                              )}
+                              {isFinished && (
+                                <span
+                                  style={{
+                                    fontSize: "0.85rem",
+                                    color: "var(--text-muted)",
+                                  }}
+                                >
+                                  Terminé
+                                </span>
+                              )}
                             </td>
                           </tr>
                         );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           )}
         </>
+      )}
+
+      {/* Live Match Modal */}
+      {liveMatchFight && (
+        <LiveMatch
+          fight={liveMatchFight}
+          discipline={selectedDiscipline}
+          onClose={() => {
+            setLiveMatchFight(null);
+            loadDetails(competitionId);
+          }}
+          onScoreUpdate={handleScoreUpdate}
+        />
       )}
     </AdminLayout>
   );

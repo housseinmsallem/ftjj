@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
+import MediaImageField from "../../components/ui/MediaImageField";
 import api from "../../services/api";
 
 const moduleConfig = {
@@ -152,6 +153,60 @@ function Field({ name, value, onChange }) {
   const isBool =
     typeof value === "boolean" ||
     ["isPublished", "featuredOnHome", "registrationEnabled"].includes(name);
+
+  if (["mainPoster", "mainImage", "logo"].includes(name)) {
+    return (
+      <label className="form-row">
+        <span>{fieldLabels[name] || name}</span>
+        <MediaImageField
+          value={String(value ?? "")}
+          onChange={(url) => onChange(name, url)}
+        />
+      </label>
+    );
+  }
+
+  if (["primaryColor", "secondaryColor", "accentColor"].includes(name)) {
+    return (
+      <label className="form-row">
+        <span>{fieldLabels[name] || name}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <input
+            type="color"
+            value={String(value ?? "#000000")}
+            onChange={(e) => onChange(name, e.target.value)}
+            style={{
+              width: "44px",
+              height: "36px",
+              padding: "2px",
+              border: "1px solid var(--border)",
+              borderRadius: "6px",
+              cursor: "pointer",
+              background: "transparent",
+            }}
+          />
+          <input
+            type="text"
+            value={String(value ?? "")}
+            onChange={(e) => onChange(name, e.target.value)}
+            placeholder="#000000"
+            style={{ width: "110px", fontFamily: "monospace" }}
+          />
+          <span
+            style={{
+              width: "28px",
+              height: "28px",
+              borderRadius: "6px",
+              background: String(value ?? "#ccc"),
+              border: "1px solid rgba(255,255,255,0.2)",
+              flexShrink: 0,
+            }}
+          />
+        </div>
+      </label>
+    );
+  }
+
   if (isBool)
     return (
       <label className="form-row">

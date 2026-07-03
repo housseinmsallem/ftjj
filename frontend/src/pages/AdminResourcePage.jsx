@@ -47,6 +47,13 @@ const configs = {
       { key: "weight", label: "Poids", type: "number" },
       { key: "phone", label: "Telephone", type: "text" },
       { key: "city", label: "Ville", type: "text" },
+      {
+        key: "club",
+        label: "Club",
+        type: "lookup",
+        endpoint: "/clubs",
+        displayKey: "name",
+      },
       { key: "birthDate", label: "Date de naissance", type: "date" },
       {
         key: "photo",
@@ -106,6 +113,13 @@ const configs = {
       { key: "lastName", label: "Nom", type: "text", required: true },
       { key: "email", label: "Email", type: "email" },
       { key: "phone", label: "Telephone", type: "text" },
+      {
+        key: "club",
+        label: "Club",
+        type: "lookup",
+        endpoint: "/clubs",
+        displayKey: "name",
+      },
       { key: "licenseNumber", label: "Numero licence", type: "text" },
       { key: "experienceYears", label: "Experience", type: "number" },
       { key: "birthDate", label: "Date de naissance", type: "date" },
@@ -190,6 +204,62 @@ const configs = {
       ["birthDate", "Date de naissance"],
     ],
   },
+  technicians: {
+    title: "Gestion des techniciens",
+    endpoint: "/technicians",
+    fields: [
+      { key: "firstName", label: "Prénom", type: "text", required: true },
+      { key: "lastName", label: "Nom", type: "text", required: true },
+      { key: "email", label: "Email", type: "email" },
+      { key: "phone", label: "Telephone", type: "text" },
+      {
+        key: "club",
+        label: "Club",
+        type: "lookup",
+        endpoint: "/clubs",
+        displayKey: "name",
+      },
+      { key: "licenseNumber", label: "Numero licence", type: "text" },
+      { key: "birthDate", label: "Date de naissance", type: "date" },
+      {
+        key: "specialty",
+        label: "Specialite",
+        type: "select",
+        options: ["BJJ", "NE_WAZA", "MMA", "JU_JITSU", "SELF_DEFENSE", "OTHER"],
+      },
+      {
+        key: "licenseStatus",
+        label: "Licence",
+        type: "select",
+        options: ["PENDING", "ACTIVE", "EXPIRED"],
+      },
+      { key: "experienceYears", label: "Experience", type: "number" },
+      {
+        key: "photo",
+        label: "Photo",
+        type: "file",
+        render: (row) => (
+          <img src={BASE_URL + row.photo} className="custom-club-style" />
+        ),
+      },
+      {
+        key: "certifications",
+        label: "Certifications",
+        type: "textarea",
+        rows: 4,
+      },
+      { key: "bio", label: "Bio", type: "textarea", rows: 4 },
+    ],
+    columns: [
+      ["firstName", "Prénom"],
+      ["lastName", "Nom"],
+      ["specialty", "Specialite"],
+      ["experienceYears", "Annees"],
+      ["licenseNumber", "Licence N"],
+      ["licenseStatus", "Statut"],
+      ["birthDate", "Date de naissance"],
+    ],
+  },
   competitions: {
     title: "Gestion des competitions",
     endpoint: "/competitions",
@@ -240,7 +310,22 @@ const configs = {
         key: "ownerType",
         label: "Proprietaire",
         type: "select",
-        options: ["CLUB", "ATHLETE", "COACH", "REFEREE", "FEDERATION"],
+        options: [
+          "CLUB",
+          "ATHLETE",
+          "COACH",
+          "REFEREE",
+          "TECHNICIAN",
+          "FEDERATION",
+        ],
+      },
+      {
+        key: "ownerId",
+        label: "ID propriétaire",
+        type: "lookup",
+        endpoint: "/athletes",
+        displayKey: "name",
+        required: true,
       },
       { key: "fileUrl", label: "URL fichier" },
     ],
@@ -262,7 +347,14 @@ const configs = {
         required: true,
         options: ["CLUB", "ATHLETE"],
       },
-      { key: "payerId", label: "ID payeur", type: "text", required: true },
+      {
+        key: "payerId",
+        label: "Payeur",
+        type: "lookup",
+        endpoint: "/athletes",
+        displayKey: "name",
+        required: true,
+      },
       { key: "amount", label: "Montant", type: "number", required: true },
       {
         key: "method",
@@ -306,16 +398,20 @@ const configs = {
         label: "Type",
         type: "select",
         required: true,
-        options: ["CLUB", "ATHLETE", "COACH", "REFEREE"],
+        options: ["CLUB", "ATHLETE", "COACH", "REFEREE", "TECHNICIAN"],
       },
       {
         key: "ownerId",
-        label: "ID proprietaire",
-        type: "text",
+        label: "Propriétaire",
+        type: "lookup",
+        endpoint: "/athletes",
+        displayKey: "name",
         required: true,
       },
       { key: "year", label: "Annee", type: "number" },
-      { key: "amount", label: "Montant", type: "number" },
+      { key: "amount", label: "Montant (TND)", type: "number" },
+      { key: "serviceType", label: "Service", type: "select", options: ["INSCRIPTION_ANNUELLE","LICENSE_COACH","LICENSE_TECHNICIEN","LICENSE_ATHLETE","LICENSE_REFEREE","STAGE_PASSAGE_GRADE","RECYCLAGE_COACH","RECYCLAGE_ARBITRE","PASSAGE_GRADE_MARRON","PASSAGE_GRADE_BLACK","PASSAGE_GRADE_ARBITRE_1","PASSAGE_GRADE_ARBITRE_2","PASSAGE_GRADE_ARBITRE_3","COACH_FEDERALE","PARTICIPATION_COMPETITION","PARTICIPATION_QUALIFICATIONS","PARTICIPATION_FINALS","ASSURANCE_COMPETITION_MALE","ASSURANCE_COMPETITION_FEMALE","OTHER"] },
+      { key: "status", label: "Statut", type: "select", options: ["PENDING","ACTIVE","EXPIRED","SUSPENDED","REJECTED"] },
     ],
     columns: [
       ["ownerType", "Type"],
@@ -486,24 +582,6 @@ export default function AdminResourcePage({ type }) {
     }
   }
 
-  async function exportLicensePdf(row) {
-    try {
-      const url = `/exports/licenses/${row._id}/pdf`;
-      const res = await api.get(url, { responseType: "blob" });
-      const blob = new Blob([res.data], { type: "application/pdf" });
-      const downloadUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = `ftjj-licence-${row._id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(downloadUrl);
-    } catch (error) {
-      setMessage(error.response?.data?.message || "Export licence impossible");
-    }
-  }
-
   const actionColumn = {
     key: "adminActions",
     label: "Actions",
@@ -516,15 +594,6 @@ export default function AdminResourcePage({ type }) {
             onClick={() => setEditing(row)}
           >
             Modifier
-          </button>
-        )}
-        {type === "licenses" && (
-          <button
-            className="ghost"
-            type="button"
-            onClick={() => exportLicensePdf(row)}
-          >
-            Exporter PDF
           </button>
         )}
         {type === "clubs" && row.affiliationStatus !== "APPROVED" && (
@@ -588,7 +657,13 @@ export default function AdminResourcePage({ type }) {
         title="Liste"
         rows={rows}
         columns={columns}
-        showExportLicence={["athletes", "coaches", "referees"].includes(type)}
+        showExportLicence={[
+          "athletes",
+          "coaches",
+          "referees",
+          "technicians",
+          "licenses",
+        ].includes(type)}
       />
     </AdminLayout>
   );

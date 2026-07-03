@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import DataTable from "../components/ui/DataTable";
 import { formatJiuJitsuGrade, formatNewazaGrade } from "../utils/grades";
+import ClubLayout from "../components/layout/ClubLayout";
 
 function normalizeRows(payload) {
   if (Array.isArray(payload)) return payload;
@@ -11,6 +13,7 @@ function normalizeRows(payload) {
 }
 
 export default function ClubDashboard() {
+  const navigate = useNavigate();
   const [athletes, setAthletes] = useState([]);
   const [competitions, setCompetitions] = useState([]);
   const [documents, setDocuments] = useState([]);
@@ -39,13 +42,59 @@ export default function ClubDashboard() {
   }, [athletes, query]);
 
   return (
-    <div className="page club-dashboard">
+    <ClubLayout>
       <div className="page-head">
         <h1>Espace Club / Association</h1>
         <p>
           Gestion des athletes, documents, licences, affiliations et
           inscriptions competitions.
         </p>
+      </div>
+
+      {/* Quick Actions */}
+      <div
+        style={{
+          display: "flex",
+          gap: "0.75rem",
+          marginBottom: "1.5rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          className="primary"
+          onClick={() => navigate("/club/import")}
+          style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+        >
+          📥 Importer des athlètes
+        </button>
+        <button
+          className="btn-outline"
+          onClick={() => navigate("/club/transfer")}
+          style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+        >
+          🔄 Demander un transfert
+        </button>
+        <button
+          className="btn-outline"
+          onClick={() => navigate("/club/competitions")}
+          style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+        >
+          🏆 Inscriptions compétitions
+        </button>
+        <button
+          className="btn-outline"
+          onClick={() => navigate("/club/registrations")}
+          style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+        >
+          📋 Mes inscriptions
+        </button>
+        <button
+          className="btn-outline"
+          onClick={() => navigate("/club/documents")}
+          style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+        >
+          📁 Documents
+        </button>
       </div>
 
       <div className="stats-grid">
@@ -129,6 +178,6 @@ export default function ClubDashboard() {
           rows={documents}
         />
       </section>
-    </div>
+    </ClubLayout>
   );
 }

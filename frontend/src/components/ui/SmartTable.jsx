@@ -1,6 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { ExportLicence } from "../licences/exportLicence";
-export default function SmartTable({ columns, rows = [], title, actions, showExportLicence = false }) {
+import LicensePrintWrapper from "../licences/LicensePrintWrapper";
+export default function SmartTable({
+  columns,
+  rows = [],
+  title,
+  actions,
+  showExportLicence = false,
+}) {
   const [q, setQ] = useState("");
   const filtered = useMemo(
     () =>
@@ -45,7 +52,17 @@ export default function SmartTable({ columns, rows = [], title, actions, showExp
                 ))}
                 {showExportLicence && (
                   <td>
-                    <ExportLicence holderData={row} />
+                    {row.licenseStatus === "ACTIVE" || row.ownerType ? (
+                      row.ownerType ? (
+                        <LicensePrintWrapper licenseRow={row} />
+                      ) : (
+                        <ExportLicence holderData={row} />
+                      )
+                    ) : (
+                      <span style={{ color: "#9ca3af", fontSize: "0.75rem" }}>
+                        —
+                      </span>
+                    )}
                   </td>
                 )}
               </tr>

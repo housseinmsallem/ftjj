@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "../../services/api";
+import ClubLayout from "../../components/layout/ClubLayout";
+
 export default function ClubCompetitionRegistration() {
   const [competitions, setCompetitions] = useState([]);
   const [form, setForm] = useState({
@@ -21,8 +23,13 @@ export default function ClubCompetitionRegistration() {
     }
   }
   return (
-    <section className="panel">
-      <h1>Inscription competition</h1>
+    <ClubLayout>
+      <div className="page-head">
+        <h1>Inscription à une Compétition</h1>
+        <p>
+          Sélectionnez la compétition et les détails pour inscrire un athlète.
+        </p>
+      </div>
       {msg && <div className="notice">{msg}</div>}
       <form onSubmit={submit} className="resource-form">
         <label>
@@ -58,6 +65,6 @@ export default function ClubCompetitionRegistration() {
         ))}
         <button>Soumettre</button>
       </form>
-    </section>
+    </ClubLayout>
   );
 }

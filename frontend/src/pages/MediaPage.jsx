@@ -1,7 +1,26 @@
-import { Link } from "react-router-dom";
-import { mediaShowcase } from "../data/publicContent";
+import React, { useState, useEffect } from "react";
 
 export default function MediaPage() {
+  const [assets, setAssets] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMedia = async () => {
+      try {
+        const res = await fetch("/api/media/public");
+        if (res.ok) {
+          const data = await res.json();
+          setAssets(data);
+        }
+      } catch {
+        // Silently fail, will show empty state
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMedia();
+  }, []);
+
   return (
     <div className="public-page-shell">
       <section className="public-hero-banner public-hero-media-page">
@@ -29,21 +48,70 @@ export default function MediaPage() {
 
       <section className="public-section">
         <div className="section-inner">
-          <div className="feature-grid editorial-three">
-            {mediaShowcase.map((item, index) => (
-              <article
-                className={`surface-card media-card media-card-${index + 1}`}
-                key={item.title}
-              >
-                <span className="feature-chip">{item.tag}</span>
-                <h3>{item.title}</h3>
-                <p>{item.text}</p>
-                <Link className="public-btn ghost" to={item.cta}>
-                  Explorer
-                </Link>
-              </article>
-            ))}
-          </div>
+          {loading ? (
+            <p style={{ textAlign: "center", padding: "2rem 0" }}>
+              Chargement...
+            </p>
+          ) : assets.length === 0 ? (
+            <p
+              style={{
+                textAlign: "center",
+                padding: "3rem 0",
+                color: "#64748b",
+              }}
+            >
+              Aucun média disponible pour le moment.
+            </p>
+          ) : (
+            <div className="feature-grid editorial-three">
+              {assets.map((item, index) => (
+                <article
+                  className={`surface-card media-card media-card-${index + 1}`}
+                  key={item._id}
+                >
+                  {item.url &&
+                    (item.mimeType && item.mimeType.includes("image") ? (
+                      <img
+                        src={item.url}
+                        alt={item.originalName || item.filename || ""}
+                        style={{
+                          width: "100%",
+                          height: "180px",
+                          objectFit: "cover",
+                          borderRadius: "8px",
+                          marginBottom: "0.75rem",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "180px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "#f1f5f9",
+                          borderRadius: "8px",
+                          marginBottom: "0.75rem",
+                          fontSize: "3rem",
+                        }}
+                      >
+                        📄
+                      </div>
+                    ))}
+                  <span className="feature-chip">
+                    {item.category || "MEDIA"}
+                  </span>
+                  <h3>{item.originalName || item.filename || "Sans titre"}</h3>
+                  <p>
+                    {item.createdAt
+                      ? `Ajouté le ${new Date(item.createdAt).toLocaleDateString()}`
+                      : ""}
+                  </p>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>

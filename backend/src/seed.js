@@ -121,7 +121,8 @@ const [athleteAhmed, athleteYassine] = await Athlete.create([
 const coach = await Coach.create({
   federation: federation._id,
   firstName: 'Coach FirstName',
-  lastName: 'Coach Last Name',  
+  lastName: 'Coach Last Name',
+  birthDate: new Date('1985-03-15'),
   email: 'coach@ftjj.tn',
   phone: '+216 21 333 333',
   club: club._id,
@@ -172,6 +173,7 @@ const referee = await Referee.create({
   federation: federation._id,
   firstName: 'Arbitre',
   lastName: 'Officiel',
+  birthDate: new Date('1990-07-20'),
   email: 'referee@ftjj.tn',
   phone: '+216 22 444 444',
   licenseNumber: 'REF-2026-001',

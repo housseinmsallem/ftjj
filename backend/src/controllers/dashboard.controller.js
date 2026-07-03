@@ -7,7 +7,6 @@ import Payment from '../models/Payment.js';
 import Document from '../models/Document.js';
 import Event from '../models/Event.js';
 import CompetitionRegistration from '../models/CompetitionRegistration.js';
-import Fight from '../models/Fight.js';
 import ScoringSession from '../models/ScoringSession.js';
 
 export async function stats(req, res) {
@@ -24,7 +23,6 @@ export async function stats(req, res) {
     Document.countDocuments({ status: 'PENDING' }),
     Payment.aggregate([{ $match: { status: 'PAID' } }, { $group: { _id: null, total: { $sum: '$amount' } } }])
   ]);
-  const recentResults = await Fight.find({ status: 'FINISHED' }).populate('redAthlete blueAthlete winner').sort({ updatedAt: -1 }).limit(5);
   const latestRegistrations = await CompetitionRegistration.find().sort({ createdAt: -1 }).limit(5);
-  res.json({ clubs, athletes, coaches, referees, competitions, upcomingEvents, pendingRegistrations, liveCompetitions, liveFights, pendingDocs, revenue: paidPayments[0]?.total || 0, recentResults, latestRegistrations, alerts: pendingRegistrations ? [`${pendingRegistrations} inscriptions a valider`] : [] });
+  res.json({ clubs, athletes, coaches, referees, competitions, upcomingEvents, pendingRegistrations, liveCompetitions, liveFights, pendingDocs, revenue: paidPayments[0]?.total || 0, latestRegistrations, alerts: pendingRegistrations ? [`${pendingRegistrations} inscriptions a valider`] : [] });
 }

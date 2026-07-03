@@ -1,4 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import api from "../../services/api";
+import MediaImageField from "./MediaImageField";
+
 export default function ResourceForm({
   fields,
   onSubmit,
@@ -7,9 +10,71 @@ export default function ResourceForm({
   onCancel = null,
 }) {
   const [form, setForm] = useState(initialValues);
+  const [lookupOptions, setLookupOptions] = useState({});
+  const [lookupSearch, setLookupSearch] = useState({});
+  const [lookupDisplay, setLookupDisplay] = useState({});
+  const [lookupOpen, setLookupOpen] = useState({});
+  const [lookupLoading, setLookupLoading] = useState({});
+  const fetchedRef = useRef({});
+
   useEffect(() => {
     setForm(initialValues || {});
   }, [initialValues]);
+
+  // Fetch lookup data once per endpoint key
+  useEffect(() => {
+    const lookupFields = fields.filter((f) => f.type === "lookup");
+    lookupFields.forEach((field) => {
+      if (!fetchedRef.current[field.key]) {
+        fetchedRef.current[field.key] = true;
+        setLookupLoading((prev) => ({ ...prev, [field.key]: true }));
+        api
+          .get(field.endpoint)
+          .then((res) => {
+            const data = Array.isArray(res.data)
+              ? res.data
+              : res.data?.data || [];
+            setLookupOptions((prev) => ({ ...prev, [field.key]: data }));
+          })
+          .catch(() => {
+            setLookupOptions((prev) => ({ ...prev, [field.key]: [] }));
+          })
+          .finally(() => {
+            setLookupLoading((prev) => ({ ...prev, [field.key]: false }));
+          });
+      }
+    });
+  }, [fields]);
+
+  // Pre-populate display text from initialValues once options load
+  useEffect(() => {
+    const lookupFields = fields.filter((f) => f.type === "lookup");
+    lookupFields.forEach((field) => {
+      const options = lookupOptions[field.key];
+      const initialId = initialValues[field.key];
+      if (
+        options &&
+        options.length > 0 &&
+        initialId &&
+        !lookupDisplay[field.key]
+      ) {
+        const match = options.find((item) => item._id === initialId);
+        if (match) {
+          setLookupDisplay((prev) => ({
+            ...prev,
+            [field.key]: getDisplayValue(match, field.displayKey),
+          }));
+        }
+      }
+    });
+  }, [lookupOptions, initialValues, fields]);
+
+  function getDisplayValue(item, displayKey) {
+    const val = item[displayKey];
+    if (val !== undefined && val !== null) return String(val);
+    return `${item.firstName || ""} ${item.lastName || ""}`.trim() || item._id;
+  }
+
   function change(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -43,13 +108,96 @@ export default function ResourceForm({
 
     if (field.type === "file") {
       return (
-        <input
-          type="file"
-          // Crucial: Clear value string constraint for file inputs for security reasons.
-          // Instead, listen for the file object array allocation
-          onChange={(e) => change(field.key, e.target.files[0])}
-          required={field.required && !initialValues[field.key]} // Not required on edits if already exists
+        <MediaImageField
+          value={form[field.key] || ""}
+          onChange={(url) => change(field.key, url)}
+          label={field.label}
         />
+      );
+    }
+
+    if (field.type === "lookup") {
+      const options = lookupOptions[field.key] || [];
+      const search = lookupSearch[field.key] || "";
+      const display = lookupDisplay[field.key] || "";
+      const open = lookupOpen[field.key] || false;
+      const loading = lookupLoading[field.key];
+      const filtered = options.filter((item) => {
+        const displayVal = getDisplayValue(item, field.displayKey);
+        return displayVal.toLowerCase().includes(search.toLowerCase());
+      });
+
+      return (
+        <div className="lookup-wrapper" style={{ position: "relative" }}>
+          <input
+            type="text"
+            value={open ? search : display}
+            placeholder={loading ? "Chargement..." : "Rechercher..."}
+            onChange={(e) => {
+              setLookupSearch((prev) => ({
+                ...prev,
+                [field.key]: e.target.value,
+              }));
+              setLookupOpen((prev) => ({ ...prev, [field.key]: true }));
+            }}
+            onFocus={() =>
+              setLookupOpen((prev) => ({ ...prev, [field.key]: true }))
+            }
+            onBlur={() => {
+              setTimeout(
+                () =>
+                  setLookupOpen((prev) => ({ ...prev, [field.key]: false })),
+                200,
+              );
+            }}
+            required={field.required}
+            autoComplete="off"
+          />
+          {open && filtered.length > 0 && (
+            <div
+              className="lookup-dropdown"
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                right: 0,
+                maxHeight: "200px",
+                overflowY: "auto",
+                background: "var(--bg, white)",
+                border: "1px solid var(--border, #ccc)",
+                borderRadius: "4px",
+                zIndex: 1000,
+                listStyle: "none",
+                padding: 0,
+                margin: 0,
+              }}
+            >
+              {filtered.map((item) => (
+                <div
+                  key={item._id}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    change(field.key, item._id);
+                    const displayVal = getDisplayValue(item, field.displayKey);
+                    setLookupDisplay((prev) => ({
+                      ...prev,
+                      [field.key]: displayVal,
+                    }));
+                    setLookupSearch((prev) => ({ ...prev, [field.key]: "" }));
+                    setLookupOpen((prev) => ({ ...prev, [field.key]: false }));
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    borderBottom: "1px solid var(--border, #eee)",
+                  }}
+                >
+                  {getDisplayValue(item, field.displayKey)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       );
     }
 
@@ -68,29 +216,7 @@ export default function ResourceForm({
       className="resource-form"
       onSubmit={async (e) => {
         e.preventDefault();
-
-        // ─── NEW: CONDITIONAL FORMDATA PROCESSING ──────────────────────────
-        // Check if any of the fields inside our form config is a file type
-        const hasFile = fields.some((f) => f.type === "file");
-
-        if (hasFile) {
-          const formData = new FormData();
-
-          // Append all fields to the FormData payload dynamically
-          Object.keys(form).forEach((key) => {
-            // Only append values that actually exist
-            if (form[key] !== undefined && form[key] !== null) {
-              formData.append(key, form[key]);
-            }
-          });
-
-          // Submit using the multi-part data payload instead of raw state object
-          await onSubmit(formData);
-        } else {
-          // If no files are needed, keep passing standard text payload object
-          await onSubmit(form);
-        }
-
+        await onSubmit(form);
         if (!onCancel) setForm({});
       }}
     >

@@ -38,17 +38,36 @@ function syncGradePayload(payload = {}) {
   return payload;
 }
 
+// Sub-schema for tracking historical club associations
+const associationEntrySchema = new mongoose.Schema({
+  clubId: { type: mongoose.Schema.Types.ObjectId, ref: 'Club' },
+  fromDate: Date,
+  toDate: Date,
+  reason: String,
+  modifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+}, { _id: false, timestamps: false });
+
 const athleteSchema = new mongoose.Schema({
   federation: { type: mongoose.Schema.Types.ObjectId, ref: 'Federation', index: true },
+  federalId: { type: String, unique: true, index: { sparse: true } },
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
   photo: String,
   phone: String,
   city: String,
   birthDate: Date,
-  gender: { type: String, enum: ['MALE', 'FEMALE'] },
+  dateOfBirth: Date,
+  age: Number,
+  gender: { type: String, enum: ['M', 'F', 'OTHER', 'MALE', 'FEMALE'] },
+  specialty: { type: String, enum: ['BJJ', 'NE_WAZA', 'MMA', 'JU_JITSU', 'SELF_DEFENSE', 'OTHER'] },
+  validationStatus: { type: String, enum: ['DRAFT', 'PENDING', 'VALIDATED', 'REJECTED', 'SUSPENDED'], default: 'PENDING' },
+  validatedAt: Date,
+  validatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  lastCorrectionReason: String,
+  associationHistory: [associationEntrySchema],
   club: { type: mongoose.Schema.Types.ObjectId, ref: 'Club' },
-  category: { type: String, required: true },
+  currentAssociation: { type: mongoose.Schema.Types.ObjectId, ref: 'Club' },
+  category: { type: String },
   weight: Number,
   belt: { type: String, enum: ['WHITE', 'BLUE', 'PURPLE', 'BROWN', 'BLACK'], default: 'WHITE' },
   blackBeltDegree: { type: Number, min: 1, max: 10 },
@@ -66,8 +85,40 @@ const athleteSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
+// --- Pre-save hooks ---
+
 athleteSchema.pre('validate', function syncLegacyGrades(next) {
   syncGradePayload(this);
+  next();
+});
+
+// Compliance guard: require an active federal license for the current season
+// before an athlete can be marked as active (licenseStatus = 'ACTIVE').
+athleteSchema.pre('save', async function requireLicenseBeforeActivation(next) {
+  if (this.isModified('licenseStatus') && this.licenseStatus === 'ACTIVE') {
+    const License = mongoose.model('License');
+    const currentYear = new Date().getFullYear();
+
+    const activeLicense = await License.findOne({
+      ownerType: 'ATHLETE',
+      ownerId: this._id,
+      year: currentYear,
+      status: 'ACTIVE'
+    }).lean();
+
+    if (!activeLicense) {
+      const err = new Error(
+        `Impossible d'activer l'athlete : aucune licence federale active trouvee pour la saison ${currentYear}. ` +
+        'Veuillez d\'abord emettre une licence federale.'
+      );
+      return next(err);
+    }
+
+    // Sync the federal license identifier onto the athlete record
+    if (activeLicense._id) {
+      this.licenseNumber = this.licenseNumber || String(activeLicense._id);
+    }
+  }
   next();
 });
 
@@ -78,6 +129,8 @@ athleteSchema.pre('findOneAndUpdate', function syncLegacyGradesInQuery(next) {
   if (update.$set) this.setUpdate({ ...update, $set: source });
   next();
 });
+
+// --- Virtuals ---
 
 athleteSchema.virtual('jiujitsuGrade').get(function jiujitsuGrade() {
   return formatGrade(this.jiujitsuBelt || this.belt, this.jiujitsuBlackBeltDegree || this.blackBeltDegree);
@@ -98,5 +151,8 @@ athleteSchema.virtual('technicalGradesSummary').get(function technicalGradesSumm
   return parts.join(' | ');
 });
 
+// --- Indexes ---
+
 athleteSchema.index({ firstName: 'text', lastName: 'text', category: 'text', belt: 'text' });
+
 export default mongoose.model('Athlete', athleteSchema);

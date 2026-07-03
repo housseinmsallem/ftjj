@@ -10,6 +10,7 @@ const mediaAssetSchema = new mongoose.Schema({
   width: Number,
   height: Number,
   category: { type: String, enum: ['LOGO','POSTER','ATHLETE_PHOTO','COACH_PHOTO','REFEREE_PHOTO','CLUB_PHOTO','HERO','SPONSOR','DOCUMENT','GALLERY','SCORING','OTHER'], default: 'OTHER' },
+  public: { type: Boolean, default: false },
   tags: [String],
   uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   usedIn: [{ entityType: String, entityId: mongoose.Schema.Types.ObjectId, field: String }]

@@ -14,10 +14,14 @@ const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 const roles = ['SUPER_ADMIN','FEDERATION_ADMIN','MEDIA_MANAGER'];
 function scope(req) { return req.user?.federation && req.user.role !== 'SUPER_ADMIN' ? { federation: req.user.federation } : {}; }
 async function createAsset(req, file) {
-  const asset = await MediaAsset.create({ ...scope(req), filename: file.filename, originalName: file.originalname, url: `/uploads/media/${file.filename}`, mimeType: file.mimetype, size: file.size, category: req.body.category || 'OTHER', tags: String(req.body.tags || '').split(',').map((x) => x.trim()).filter(Boolean), uploadedBy: req.user._id });
+  const asset = await MediaAsset.create({ ...scope(req), filename: file.filename, originalName: file.originalname, url: `/uploads/media/${file.filename}`, mimeType: file.mimetype, size: file.size, category: req.body.category || 'OTHER', public: req.body.public === 'true' || req.body.public === true, tags: String(req.body.tags || '').split(',').map((x) => x.trim()).filter(Boolean), uploadedBy: req.user._id });
   await audit({ actor: req.user._id, action: 'MEDIA_UPLOADED', entity: 'MediaAsset', entityId: asset._id });
   return asset;
 }
+router.get('/public', async (req, res) => {
+  const query = { public: true, category: 'GALLERY' };
+  res.json(await MediaAsset.find(query).sort({ createdAt: -1 }).limit(100));
+});
 router.get('/', protect, async (req, res) => {
   const query = { ...scope(req) };
   if (req.query.category) query.category = req.query.category;

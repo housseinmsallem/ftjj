@@ -425,6 +425,32 @@ export default function Home() {
             <article className="surface-card editorial-panel">
               <div className="panel-headline">
                 <h3>Prochains evenements</h3>
+                <span
+                  style={{
+                    fontSize: "0.65rem",
+                    padding: "2px 8px",
+                    borderRadius: "10px",
+                    background:
+                      (home.events || []).filter((item) =>
+                        ["EVENT", "STAGE", "CHAMPIONSHIP"].includes(item.type),
+                      ).length > 0
+                        ? "rgba(34,197,94,0.15)"
+                        : "rgba(234,179,8,0.15)",
+                    color:
+                      (home.events || []).filter((item) =>
+                        ["EVENT", "STAGE", "CHAMPIONSHIP"].includes(item.type),
+                      ).length > 0
+                        ? "#4ade80"
+                        : "#facc15",
+                    fontWeight: 600,
+                  }}
+                >
+                  {(home.events || []).filter((item) =>
+                    ["EVENT", "STAGE", "CHAMPIONSHIP"].includes(item.type),
+                  ).length > 0
+                    ? "✓ Données réelles"
+                    : "⚠ Démo"}
+                </span>
                 <Link to="/competitions">Voir tout</Link>
               </div>
               {events.slice(0, 3).map((event) => {
@@ -448,6 +474,32 @@ export default function Home() {
             <article className="surface-card editorial-panel editorial-panel-wide">
               <div className="panel-headline">
                 <h3>Actualites</h3>
+                <span
+                  style={{
+                    fontSize: "0.65rem",
+                    padding: "2px 8px",
+                    borderRadius: "10px",
+                    background:
+                      (home.events || []).filter((item) =>
+                        ["NEWS", "ANNOUNCEMENT"].includes(item.type),
+                      ).length > 0
+                        ? "rgba(34,197,94,0.15)"
+                        : "rgba(234,179,8,0.15)",
+                    color:
+                      (home.events || []).filter((item) =>
+                        ["NEWS", "ANNOUNCEMENT"].includes(item.type),
+                      ).length > 0
+                        ? "#4ade80"
+                        : "#facc15",
+                    fontWeight: 600,
+                  }}
+                >
+                  {(home.events || []).filter((item) =>
+                    ["NEWS", "ANNOUNCEMENT"].includes(item.type),
+                  ).length > 0
+                    ? "✓ Données réelles"
+                    : "⚠ Démo"}
+                </span>
                 <Link to="/actualites">Voir tout</Link>
               </div>
               {featuredNews && (

@@ -26,6 +26,8 @@ export default function AdminContentBuilder() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState("");
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [mediaAssets, setMediaAssets] = useState([]);
 
   async function load() {
     const { data } = await api.get("/content");
@@ -81,6 +83,16 @@ export default function AdminContentBuilder() {
     await api.delete(`/content/${id}`);
     setMessage("Contenu supprimé.");
     load();
+  }
+
+  async function openMediaPicker() {
+    try {
+      const { data } = await api.get("/media");
+      setMediaAssets(Array.isArray(data) ? data : []);
+      setShowMediaPicker(true);
+    } catch {
+      setMessage("Impossible de charger la médiathèque.");
+    }
   }
 
   const columns = [
@@ -150,6 +162,14 @@ export default function AdminContentBuilder() {
           </div>
         </div>
         <form className="content-builder-form" onSubmit={submit}>
+          <div
+            className="notice info"
+            style={{ gridColumn: "1/-1", marginBottom: "0.5rem" }}
+          >
+            💡 Pour apparaître sur le site public, le contenu doit être en
+            statut <strong>Publié</strong> ET avoir{" "}
+            <strong>'Afficher accueil'</strong> coché.
+          </div>
           <label>
             Titre
             <input
@@ -206,6 +226,14 @@ export default function AdminContentBuilder() {
               value={form.imageUrl}
               onChange={(e) => update("imageUrl", e.target.value)}
             />
+            <button
+              type="button"
+              className="btn ghost btn-sm"
+              onClick={openMediaPicker}
+              style={{ marginTop: "0.4rem" }}
+            >
+              📁 Parcourir la médiathèque
+            </button>
           </label>
           <label>
             Date début
@@ -289,6 +317,125 @@ export default function AdminContentBuilder() {
           </div>
         </form>
       </section>
+      {showMediaPicker && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={() => setShowMediaPicker(false)}
+        >
+          <div
+            style={{
+              background: "#1e1e2e",
+              borderRadius: "12px",
+              maxWidth: "720px",
+              width: "90%",
+              maxHeight: "80vh",
+              overflow: "auto",
+              padding: "1.5rem",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+              }}
+            >
+              <h3 style={{ margin: 0, color: "#fff" }}>📁 Médiathèque</h3>
+              <button
+                type="button"
+                className="btn ghost btn-sm"
+                onClick={() => setShowMediaPicker(false)}
+              >
+                ✕ Fermer
+              </button>
+            </div>
+            {mediaAssets.length === 0 ? (
+              <p style={{ color: "#aaa" }}>Aucun média trouvé.</p>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "0.75rem",
+                }}
+              >
+                {mediaAssets.map((a) => (
+                  <div
+                    key={a._id || a.url}
+                    style={{
+                      cursor: "pointer",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      border: "2px solid transparent",
+                      background: "#2a2a3e",
+                      transition: "border-color 0.2s",
+                    }}
+                    onClick={() => {
+                      update("imageUrl", a.url);
+                      setShowMediaPicker(false);
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.borderColor = "#7c3aed")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.borderColor = "transparent")
+                    }
+                  >
+                    {a.url && /\.(pdf)$/i.test(a.url) ? (
+                      <div
+                        style={{
+                          height: "100px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "2rem",
+                          color: "#aaa",
+                        }}
+                      >
+                        📄
+                      </div>
+                    ) : (
+                      <img
+                        src={a.url}
+                        alt=""
+                        style={{
+                          width: "100%",
+                          height: "100px",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    )}
+                    <p
+                      style={{
+                        padding: "0.25rem 0.5rem",
+                        fontSize: "0.7rem",
+                        color: "#ccc",
+                        textOverflow: "ellipsis",
+                        overflow: "hidden",
+                        whiteSpace: "nowrap",
+                        margin: 0,
+                      }}
+                    >
+                      {a.originalName || a.filename || a.url?.split("/").pop()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <SmartTable title="Contenus créés" rows={items} columns={columns} />
     </AdminLayout>
   );

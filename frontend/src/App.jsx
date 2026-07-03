@@ -7,7 +7,6 @@ import Login from "./pages/Login";
 import Competitions from "./pages/Competitions";
 import Rankings from "./pages/Rankings";
 import Live from "./pages/Live";
-import FederationDashboard from "./pages/FederationDashboard";
 import ClubDashboard from "./pages/ClubDashboard";
 import AdminResourcePage from "./pages/AdminResourcePage";
 import AdminLiveScoring from "./pages/AdminLiveScoring";
@@ -24,12 +23,20 @@ import ContactPage from "./pages/ContactPage";
 import LicensedSpacePage from "./pages/LicensedSpacePage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import AdminFederationModule from "./pages/admin/AdminFederationModule";
+import AdminMediaLibrary from "./pages/AdminMediaLibrary";
 import AdminCompetitionOperations from "./pages/admin/AdminCompetitionOperations";
+import AdminAffiliationRequests from "./pages/admin/AdminAffiliationRequests";
+import AdminTransfers from "./pages/admin/AdminTransfers";
+import AdminRegistrations from "./pages/admin/AdminRegistrations";
+import AdminAthleteCorrection from "./pages/admin/AdminAthleteCorrection";
 import ScoringControl from "./pages/admin/ScoringControl";
 import PublicFightDisplay from "./pages/public/PublicFightDisplay";
 import ClubCompetitions from "./pages/club/ClubCompetitions";
 import ClubCompetitionRegistration from "./pages/club/ClubCompetitionRegistration";
 import ClubRegistrations from "./pages/club/ClubRegistrations";
+import ClubAthleteImport from "./pages/club/ClubAthleteImport";
+import ClubAthleteTransfer from "./pages/club/ClubAthleteTransfer";
+import ClubDocuments from "./pages/club/ClubDocuments";
 
 import "./assets/styles/ftjj-theme.css";
 import "./assets/styles/app.css";
@@ -81,7 +88,10 @@ export default function App() {
             <Route path="/ranking" element={<Rankings />} />
             <Route path="/live" element={<Live />} />
             <Route path="/en-direct" element={<Live />} />
-            <Route path="/admin" element={admin(<FederationDashboard />)} />
+            <Route
+              path="/admin"
+              element={admin(<Navigate to="/admin/dashboard" replace />)}
+            />
 
             {/* <Route path="/events" element={<NewsPage />} /> */}
             <Route
@@ -114,7 +124,7 @@ export default function App() {
             />
             <Route
               path="/admin/media-library"
-              element={admin(<AdminFederationModule module="media" />)}
+              element={admin(<AdminMediaLibrary />)}
             />
             <Route
               path="/admin/events"
@@ -124,6 +134,19 @@ export default function App() {
               path="/admin/news"
               element={admin(<AdminFederationModule module="news" />)}
             />
+            <Route
+              path="/admin/affiliations"
+              element={admin(<AdminAffiliationRequests />)}
+            />
+            <Route
+              path="/admin/registrations"
+              element={admin(<AdminRegistrations />)}
+            />
+            <Route
+              path="/admin/transfers"
+              element={admin(<AdminTransfers />)}
+            />
+
             <Route
               path="/admin/competitions/operations"
               element={admin(<AdminCompetitionOperations />)}
@@ -192,6 +215,10 @@ export default function App() {
               element={admin(<AdminResourcePage type="referees" />)}
             />
             <Route
+              path="/admin/technicians"
+              element={admin(<AdminResourcePage type="technicians" />)}
+            />
+            <Route
               path="/admin/competitions"
               element={admin(<AdminResourcePage type="competitions" />)}
             />
@@ -241,6 +268,40 @@ export default function App() {
                   <ClubDashboard />
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="/club/import"
+              element={
+                <ProtectedRoute
+                  roles={["CLUB_ADMIN", "FEDERATION_ADMIN", "SUPER_ADMIN"]}
+                >
+                  <ClubAthleteImport />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/club/transfer"
+              element={
+                <ProtectedRoute
+                  roles={["CLUB_ADMIN", "FEDERATION_ADMIN", "SUPER_ADMIN"]}
+                >
+                  <ClubAthleteTransfer />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/club/documents"
+              element={
+                <ProtectedRoute
+                  roles={["CLUB_ADMIN", "FEDERATION_ADMIN", "SUPER_ADMIN"]}
+                >
+                  <ClubDocuments />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/athlete-import"
+              element={admin(<ClubAthleteImport />)}
             />
             <Route
               path="/athlete/dashboard"

@@ -1,23 +1,42 @@
 function id(value) {
-  return String(value?._id || value || "");
+  if (value === null || value === undefined) return "";
+  return String(value?._id || value);
 }
+
 function clubId(entry) {
-  return id(entry.club || entry.clubId || entry.club?._id);
+  if (!entry) return "NO_CLUB";
+  const c = entry.club || entry.clubId || entry.club?._id;
+  return c ? String(c) : "NO_CLUB";
 }
 
 export function seedAthletesAvoidingSameClub(athletes = []) {
+  if (!athletes.length) return [];
+
   const grouped = new Map();
   for (const athlete of athletes) {
+    if (!athlete || !id(athlete)) continue;
     const key = clubId(athlete) || "NO_CLUB";
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(athlete);
   }
+
   const seeded = [];
-  while ([...grouped.values()].some((items) => items.length)) {
+  let hasItems = true;
+  while (hasItems) {
+    hasItems = false;
+    // Sort groups by size descending — fill largest groups first
     const groups = [...grouped.entries()]
-      .filter(([, items]) => items.length)
+      .filter(([, items]) => items.length > 0)
       .sort((a, b) => b[1].length - a[1].length);
-    for (const [, items] of groups) seeded.push(items.shift());
+
+    if (groups.length === 0) break;
+
+    for (const [, items] of groups) {
+      if (items.length > 0) {
+        seeded.push(items.shift());
+        hasItems = true;
+      }
+    }
   }
   return seeded;
 }
@@ -29,14 +48,25 @@ function nextPowerOfTwo(n) {
 }
 
 export function generateSingleEliminationBracket(athletes = [], options = {}) {
-  const seeded = seedAthletesAvoidingSameClub(athletes);
+  // Filter out invalid entries
+  const valid = (athletes || []).filter((a) => a && (a._id || a));
+  const count = valid.length;
+
+  if (count === 0) {
+    throw new Error("Cannot generate bracket: no athletes provided");
+  }
+
+  // Seed athletes avoiding same-club first-round matchups
+  const seeded = seedAthletesAvoidingSameClub(valid);
   const size = nextPowerOfTwo(Math.max(2, seeded.length));
-  
-  const seeds = Array.from({ length: size }, (_, index) => ({
-    position: index + 1,
-    athlete: seeded[index] || null,
+
+  // Build seed positions (pad with nulls to power of 2)
+  const seeds = Array.from({ length: size }, (_, i) => ({
+    position: i + 1,
+    athlete: seeded[i] || null,
   }));
 
+  // Build rounds
   const rounds = [];
   let currentRoundSize = size;
   let roundNumber = 1;
@@ -52,7 +82,7 @@ export function generateSingleEliminationBracket(athletes = [], options = {}) {
         redAthlete: null,
         blueAthlete: null,
         fight: null,
-        winnerSeed: null
+        winnerSeed: null,
       });
     }
     rounds.push({ round: roundNumber, matches });
@@ -60,37 +90,53 @@ export function generateSingleEliminationBracket(athletes = [], options = {}) {
     roundNumber++;
   }
 
-  // Populate Round 1 matches from the seeds
+  // Populate Round 1 from seeds
   const r1Matches = rounds[0].matches;
   for (let i = 0; i < r1Matches.length; i++) {
+    const redSeed = seeds[i * 2];
+    const blueSeed = seeds[i * 2 + 1];
     const match = r1Matches[i];
+
     match.redSeed = i * 2 + 1;
     match.blueSeed = i * 2 + 2;
-    match.redAthlete = seeds[i * 2].athlete?._id || seeds[i * 2].athlete || null;
-    match.blueAthlete = seeds[i * 2 + 1].athlete?._id || seeds[i * 2 + 1].athlete || null;
+    match.redAthlete = redSeed?.athlete?._id || redSeed?.athlete || null;
+    match.blueAthlete = blueSeed?.athlete?._id || blueSeed?.athlete || null;
   }
 
-  // Iteratively advance byes
+  // Advance byes: if a match has only one athlete, auto-qualify them
   for (let r = 0; r < rounds.length - 1; r++) {
-    const currentRoundMatches = rounds[r].matches;
-    const nextRoundMatches = rounds[r + 1].matches;
+    const currentMatches = rounds[r].matches;
+    const nextMatches = rounds[r + 1].matches;
 
-    for (const match of currentRoundMatches) {
+    for (const match of currentMatches) {
+      // Already has a winner (pre-determined advancing)
+      if (match.winnerSeed) continue;
+
+      const nextIdx = Math.ceil(match.matchNumber / 2) - 1;
+      const nextMatch = nextMatches[nextIdx];
+      if (!nextMatch) continue;
+
+      const isOdd = match.matchNumber % 2 !== 0;
+
       if (match.redAthlete && !match.blueAthlete) {
-        const nextMatchIndex = Math.ceil(match.matchNumber / 2) - 1;
-        const nextMatch = nextRoundMatches[nextMatchIndex];
-        if (match.matchNumber % 2 !== 0) {
+        // Red auto-advances
+        match.winnerSeed = match.redSeed;
+        if (isOdd) {
           nextMatch.redAthlete = match.redAthlete;
+          nextMatch.redSeed = match.redSeed;
         } else {
           nextMatch.blueAthlete = match.redAthlete;
+          nextMatch.blueSeed = match.redSeed;
         }
       } else if (match.blueAthlete && !match.redAthlete) {
-        const nextMatchIndex = Math.ceil(match.matchNumber / 2) - 1;
-        const nextMatch = nextRoundMatches[nextMatchIndex];
-        if (match.matchNumber % 2 !== 0) {
+        // Blue auto-advances
+        match.winnerSeed = match.blueSeed;
+        if (isOdd) {
           nextMatch.redAthlete = match.blueAthlete;
+          nextMatch.redSeed = match.blueSeed;
         } else {
           nextMatch.blueAthlete = match.blueAthlete;
+          nextMatch.blueSeed = match.blueSeed;
         }
       }
     }
@@ -102,37 +148,53 @@ export function generateSingleEliminationBracket(athletes = [], options = {}) {
     rounds,
     options,
   };
+
   const conflicts = detectFirstRoundClubConflicts(bracket);
   bracket.firstRoundClubConflicts = conflicts.length;
   bracket.warnings = conflicts.length
-    ? [
-        `${conflicts.length} first-round same-club conflicts detected. Manual review recommended.`,
-      ]
+    ? [`${conflicts.length} first-round same-club conflict(s) detected. Manual review recommended.`]
     : [];
+  bracket.totalAthletes = count;
+  bracket.bracketSize = size;
+
   return bracket;
 }
 
 export function detectFirstRoundClubConflicts(bracket) {
+  if (!bracket || !bracket.seeds || !bracket.rounds) return [];
+
   const seeds = bracket.seeds || [];
   const getSeed = (position) =>
-    seeds.find((seed) => seed.position === position)?.athlete;
-  const matches = bracket.rounds?.[0]?.matches || [];
+    seeds.find((s) => s.position === position)?.athlete;
+
+  const matches = bracket.rounds[0]?.matches || [];
   return matches.filter((match) => {
     const red = getSeed(match.redSeed);
     const blue = getSeed(match.blueSeed);
-    return red && blue && clubId(red) && clubId(red) === clubId(blue);
+    if (!red || !blue) return false;
+    const redClub = clubId(red);
+    const blueClub = clubId(blue);
+    return redClub && blueClub && redClub !== "NO_CLUB" && redClub === blueClub;
   });
 }
 
 export function optimizeBracketSeeding(bracket, athletes = []) {
-  return generateSingleEliminationBracket(athletes, bracket.options || {});
+  try {
+    return generateSingleEliminationBracket(athletes, bracket?.options || {});
+  } catch {
+    return bracket;
+  }
 }
 
 export function manualOverrideBracketPosition(bracket, athleteId, position) {
-  const seeds = bracket.seeds || [];
-  const target = seeds.find((seed) => seed.position === Number(position));
-  const current = seeds.find((seed) => id(seed.athlete) === id(athleteId));
-  if (current) current.athlete = target?.athlete || null;
-  if (target) target.athlete = athleteId;
+  if (!bracket || !bracket.seeds) return bracket;
+  const seeds = bracket.seeds;
+  const target = seeds.find((s) => s.position === Number(position));
+  const current = seeds.find((s) => id(s.athlete) === id(athleteId));
+  if (target && current) {
+    const temp = current.athlete;
+    current.athlete = target.athlete;
+    target.athlete = temp;
+  }
   return bracket;
 }
