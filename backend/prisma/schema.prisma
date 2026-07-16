@@ -1,0 +1,352 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CLUB_OWNER
+}
+
+enum PersonType {
+  ATHLETE
+  COACH
+  REFEREE
+  TECHNICIAN
+}
+
+enum IdentityDocumentType {
+  CIN
+  BIRTH_CERTIFICATE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LicenseCategory {
+  LICENSE
+  STAGE
+  PASSAGE_GRADE
+  COMPETITION
+}
+
+enum MatchStatus {
+  UPCOMING
+  LIVE
+  FINISHED
+}
+
+enum AgeDivision {
+  U6
+  U8
+  U10
+  U12
+  U14
+  U16
+  U18
+  U21
+  ADULTS
+  MASTERS_1
+  MASTERS_2
+  MASTERS_3
+  MASTERS_4
+}
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String
+  role       Role     @default(CLUB_OWNER)
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  club          Club?          @relation("ClubOwner")
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model Club {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  ownerId   String   @unique
+  owner     User     @relation("ClubOwner", fields: [ownerId], references: [id])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents            ClubDocument[]
+  persons              Person[]
+  registrationRequests RegistrationRequest[]
+
+  @@map("clubs")
+}
+
+model ClubDocument {
+  id        String   @id @default(uuid())
+  clubId    String
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  fileName  String
+  fileUrl   String
+  fileType  String   @default("document") // inscription_form, work_contract, black_belt_attestation, coaching_attestation
+  createdAt DateTime @default(now())
+
+  @@map("club_documents")
+}
+
+model Person {
+  id                   String               @id @default(uuid())
+  code                 String?              @unique
+  firstName            String
+  lastName             String
+  dateOfBirth          DateTime
+  nationality          String               @default("Tunisienne")
+  gender               Gender
+  photoUrl             String?
+  identityDocumentType IdentityDocumentType
+  identityDocumentUrl  String?
+  birthCertificateUrl  String?
+  type                 PersonType
+  clubId               String?
+  club                 Club?                @relation(fields: [clubId], references: [id])
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  // Type-specific relations (one will be populated based on type)
+  athleteDetails    Athlete?
+  coachDetails      Coach?
+  refereeDetails    Referee?
+  technicianDetails Technician?
+
+  licenses             License[]
+  competitionSignups   CompetitionSignup[]
+  matchesRed           Match[]               @relation("RedCorner")
+  matchesBlue          Match[]               @relation("BlueCorner")
+  registrationRequests RegistrationRequest[]
+
+  @@map("persons")
+}
+
+model Athlete {
+  id       String  @id @default(uuid())
+  personId String  @unique
+  person   Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  grade    String? // ceinture blanche, jaune, orange, verte, bleue, marron, noire 1er degré, etc.
+  weight   Float? // poids en kg pour la catégorie de poids
+
+  @@map("athletes")
+}
+
+model Coach {
+  id                      String  @id @default(uuid())
+  personId                String  @unique
+  person                  Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  blackBeltAttestationUrl String?
+  coachingAttestationUrl  String?
+  contractUrl             String?
+
+  @@map("coaches")
+}
+
+model Referee {
+  id                          String  @id @default(uuid())
+  personId                    String  @unique
+  person                      Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  refereeDegreeAttestationUrl String?
+
+  @@map("referees")
+}
+
+model Technician {
+  id             String  @id @default(uuid())
+  personId       String  @unique
+  person         Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  specialization String?
+
+  @@map("technicians")
+}
+
+model License {
+  id                String   @id @default(uuid())
+  personId          String
+  person            Person   @relation(fields: [personId], references: [id])
+  pricingId         String
+  pricing           Pricing  @relation(fields: [pricingId], references: [id])
+  issuedAt          DateTime @default(now())
+  expiryDate        DateTime
+  isActive          Boolean  @default(true)
+  paymentReceiptUrl String?
+  validatedByAdmin  Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  registrationRequest RegistrationRequest?
+
+  @@map("licenses")
+}
+
+model RegistrationRequest {
+  id                String             @id @default(uuid())
+  clubId            String
+  club              Club               @relation(fields: [clubId], references: [id])
+  personId          String?
+  person            Person?            @relation(fields: [personId], references: [id])
+  licenseId         String?            @unique
+  license           License?           @relation(fields: [licenseId], references: [id])
+  licenseType       String
+  paymentReceiptUrl String?
+  status            RegistrationStatus @default(PENDING)
+  adminComment      String?
+  createdAt         DateTime           @default(now())
+  reviewedAt        DateTime?
+
+  @@map("registration_requests")
+}
+
+model Pricing {
+  id       String          @id @default(uuid())
+  name     String          @unique
+  amount   Decimal
+  category LicenseCategory
+  licenses License[]
+
+  @@map("pricing")
+}
+
+model Competition {
+  id           String       @id @default(uuid())
+  name         String
+  date         DateTime
+  location     String?
+  description  String?
+  type         String       @default("Open")
+  splitByBelt  Boolean      @default(false)
+  isPublic     Boolean      @default(true)
+  ageDivision  AgeDivision  @default(ADULTS)
+  seasonYear   Int          @default(2026)
+  posterUrl    String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  documents   CompetitionDocument[]
+  featuredMedia FeaturedMedia[]
+  signups     CompetitionSignup[]
+  matches   Match[]
+
+  @@map("competitions")
+}
+
+model CompetitionDocument {
+  id            String      @id @default(uuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  fileName      String
+  fileUrl       String
+  createdAt     DateTime    @default(now())
+
+  @@map("competition_documents")
+}
+
+model CompetitionSignup {
+  id                String             @id @default(uuid())
+  competitionId     String
+  competition       Competition        @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  personId          String
+  person            Person             @relation(fields: [personId], references: [id])
+  type              PersonType
+  paymentReceiptUrl String?
+  status            RegistrationStatus @default(PENDING)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@map("competition_signups")
+}
+
+model Match {
+  id            String      @id @default(uuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  redCornerId   String
+  redCorner     Person      @relation("RedCorner", fields: [redCornerId], references: [id])
+  blueCornerId  String
+  blueCorner    Person      @relation("BlueCorner", fields: [blueCornerId], references: [id])
+  redScore      Int         @default(0)
+  blueScore     Int         @default(0)
+  warningsRed   Int         @default(0)
+  penaltiesRed  Int         @default(0)
+  warningsBlue  Int         @default(0)
+  penaltiesBlue Int         @default(0)
+  status        MatchStatus @default(UPCOMING)
+  matNumber     Int         @default(1)
+  winMethod     String? // points, submission, decision, forfeit, disqualification, draw
+  winnerSide    String? // red, blue, draw
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("matches")
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  title     String
+  category  String   // RULESET, FEES, CODE_OF_CONDUCT, LICENSE_DOCS, OTHER
+  fileName  String
+  fileUrl   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("documents")
+}
+
+model FeaturedMedia {
+  id          String   @id @default(uuid())
+  title       String?
+  description String?
+  imageUrl    String
+  competitionId String?
+  competition Competition? @relation(fields: [competitionId], references: [id], onDelete: SetNull)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@map("featured_media")
+}
+
+model Article {
+  id          String   @id @default(uuid())
+  title       String
+  excerpt     String
+  content     String?
+  category    String   // REGISTRATION_OPEN, STAGE_OPEN_MATS, NEW_COMPETITION, NEW_TOURNAMENT, OTHER
+  imageUrl    String?
+  isPublished Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("articles")
+}

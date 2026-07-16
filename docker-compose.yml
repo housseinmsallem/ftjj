@@ -1,11 +1,16 @@
 services:
-  mongo:
-    image: mongo:7
-    container_name: ftjj_mongo
+  postgres:
+    image: postgres:15
+    container_name: ftjj_postgres
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ftjj
+      POSTGRES_PASSWORD: ftjj_secret_2025
+      POSTGRES_DB: ftjj_db
     volumes:
-      - mongo_data:/data/db
+      - pgdata:/var/lib/postgresql/data
+
 volumes:
-  mongo_data:
+  pgdata:

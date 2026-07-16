@@ -3,19 +3,16 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
-    "install:all": "bun install --prefix backend && bun install --prefix frontend",
-    "dev": "bun run --filter \"*\" dev",
-    "build": "bun run build --prefix frontend"
+    "install:all": "bun install",
+    "dev": "concurrently \"cd backend && bun run dev\" \"cd frontend && bun run dev\"",
+    "dev:backend": "cd backend && bun run dev",
+    "dev:frontend": "cd frontend && bun run dev",
+    "build": "cd backend && bun run build && cd ../frontend && bun run build"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
   },
-  "dependencies": {
-    "backend": "^0.0.0",
-    "frontend": "^2.0.0-alpha.4"
-  },
   "workspaces": [
-    "backend",
     "frontend"
   ]
 }
