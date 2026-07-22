@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
@@ -24,6 +24,8 @@ import IdentiteFederale from "./pages/IdentiteFederale";
 import AthleteExport from "./pages/AthleteExport";
 import ScoringPage from "./pages/ScoringPage";
 import SpectatorPage from "./pages/SpectatorPage";
+import BracketModeration from "./pages/BracketModeration";
+import CompetitionDetail from "./pages/CompetitionDetail";
 
 // --- Admin pages ---
 import AdminFederationModule from "./pages/admin/AdminFederationModule";
@@ -98,15 +100,19 @@ const authenticatedRoute = (
   </ProtectedRoute>
 );
 
-export default function App(): React.ReactElement {
+function AppRoutes(): React.ReactElement {
+  const location = useLocation();
+  const isSpectator = location.pathname.startsWith("/scoring/spectator");
+
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        {/* Layout-free routes (spectator, etc.) */}
-        <Routes>
-          <Route path="/scoring/spectator" element={<SpectatorPage />} />
-        </Routes>
-        <Header />
+    <>
+      {/* Layout-free routes (spectator, etc.) */}
+      <Routes>
+        <Route path="/scoring/spectator" element={<SpectatorPage />} />
+
+      </Routes>
+      {!isSpectator && <Header />}
+      {!isSpectator && (
         <main>
           <Routes>
             {/* ========== PUBLIC ========== */}
@@ -136,9 +142,11 @@ export default function App(): React.ReactElement {
             <Route path="/ranking" element={<Rankings />} />
             <Route path="/live" element={<Live />} />
             <Route path="/en-direct" element={<Live />} />
+            <Route path="/en-direct/:competitionId" element={<CompetitionDetail />} />
             <Route path="/fight/:fightId" element={<PublicFightDisplay />} />
             <Route path="/spectator/:matchId" element={<SpectatorWindow />} />
             <Route path="/scoring" element={<ScoringPage />} />
+            <Route path="/moderate/brackets/:competitionId" element={<BracketModeration />} />
             <Route
               path="/identite-federale/:personId"
               element={<IdentiteFederale />}
@@ -177,10 +185,7 @@ export default function App(): React.ReactElement {
               path="/admin/uploads"
               element={adminRoute(<AdminUploads />)}
             />
-            <Route
-              path="/admin/live-scoring"
-              element={adminRoute(<AdminLiveScoring />)}
-            />
+
             <Route
               path="/admin/competitions/operations"
               element={adminRoute(<AdminCompetitionOperations />)}
@@ -238,10 +243,7 @@ export default function App(): React.ReactElement {
               path="/admin/export"
               element={adminRoute(<AthleteExport />)}
             />
-            <Route
-              path="/admin/live-scoring"
-              element={adminRoute(<LiveMatchControl />)}
-            />
+
             <Route path="/admin/cms" element={adminRoute(<CmsDashboard />)} />
 
             {/* ========== CLUB OWNER ========== */}
@@ -317,7 +319,17 @@ export default function App(): React.ReactElement {
             <Route path="*" element={<Home />} />
           </Routes>
         </main>
-        <Footer />
+      )}
+      {!isSpectator && <Footer />}
+    </>
+  );
+}
+
+export default function App(): React.ReactElement {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
       </BrowserRouter>
     </AuthProvider>
   );

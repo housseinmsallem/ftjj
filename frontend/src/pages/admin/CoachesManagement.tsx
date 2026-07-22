@@ -31,6 +31,7 @@ interface CoachFormData {
   blackBeltAttestationUrl: string;
   coachingAttestationUrl: string;
   contractUrl: string;
+  paymentReceiptUrl: string;
 }
 
 const emptyForm: CoachFormData = {
@@ -47,6 +48,7 @@ const emptyForm: CoachFormData = {
   blackBeltAttestationUrl: "",
   coachingAttestationUrl: "",
   contractUrl: "",
+  paymentReceiptUrl: "",
 };
 
 export default function CoachesManagement(): React.ReactElement {
@@ -56,6 +58,7 @@ export default function CoachesManagement(): React.ReactElement {
   const [form, setForm] = useState<CoachFormData>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const {
     data: personsData,
@@ -64,9 +67,9 @@ export default function CoachesManagement(): React.ReactElement {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["persons", "COACH"],
+    queryKey: ["persons", "COACH", searchText],
     queryFn: async () => {
-      const res = await api.get("/persons", { params: { type: "COACH" } });
+      const res = await api.get("/persons", { params: { type: "COACH", search: searchText || undefined } });
       return (((res.data as any)?.data ?? res.data) as Person[]) || [];
     },
   });
@@ -105,6 +108,7 @@ export default function CoachesManagement(): React.ReactElement {
       blackBeltAttestationUrl: ext.blackBeltAttestationUrl || "",
       coachingAttestationUrl: ext.coachingAttestationUrl || "",
       contractUrl: ext.contractUrl || "",
+      paymentReceiptUrl: ext.paymentReceiptUrl || "",
     });
     setModalOpen(true);
   }
@@ -137,6 +141,7 @@ export default function CoachesManagement(): React.ReactElement {
       blackBeltAttestationUrl: form.blackBeltAttestationUrl,
       coachingAttestationUrl: form.coachingAttestationUrl,
       contractUrl: form.contractUrl || undefined,
+      paymentReceiptUrl: form.paymentReceiptUrl || undefined,
     };
 
     Object.keys(payload).forEach((k) => {
@@ -240,6 +245,27 @@ export default function CoachesManagement(): React.ReactElement {
           </button>
         }
       />
+
+      <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Rechercher par nom..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{
+            background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: "10px 16px", fontSize: "0.9rem", width: 300,
+          }}
+        />
+        {searchText && (
+          <button className="btn ghost" onClick={() => setSearchText("")}>
+            ✕ Effacer
+          </button>
+        )}
+        <span className="muted" style={{ fontSize: "0.85rem" }}>
+          {persons.length} résultat{persons.length !== 1 ? "s" : ""}
+        </span>
+      </div>
 
       <div className="table-card">
         {persons.length === 0 ? (
@@ -559,7 +585,7 @@ export default function CoachesManagement(): React.ReactElement {
               </div>
               <div style={{ marginTop: 18 }}>
                 <FileUpload
-                  label="Attestation ceinture noire"
+                  label="Attestation Grade"
                   accept=".pdf,.jpg,.jpeg,.png"
                   maxSizeMB={5}
                   onUploaded={(url) =>
@@ -586,6 +612,15 @@ export default function CoachesManagement(): React.ReactElement {
                   maxSizeMB={5}
                   onUploaded={(url) => setForm({ ...form, contractUrl: url })}
                   currentUrl={form.contractUrl || null}
+                />
+              </div>
+              <div style={{ marginTop: 18 }}>
+                <FileUpload
+                  label="Reçu de paiement"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  maxSizeMB={5}
+                  onUploaded={(url) => setForm({ ...form, paymentReceiptUrl: url })}
+                  currentUrl={form.paymentReceiptUrl || null}
                 />
               </div>
 

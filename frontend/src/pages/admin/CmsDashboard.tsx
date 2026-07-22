@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import api from "../../services/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -158,6 +158,11 @@ export default function CmsDashboard(): React.ReactElement {
   const [mediaSaving, setMediaSaving] = useState(false);
   const [deleteMediaTarget, setDeleteMediaTarget] = useState<FeaturedMediaItem | null>(null);
 
+  // --- Batch media upload ---
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [batchUploading, setBatchUploading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ name: string; progress: number; done: boolean; url?: string }[]>([]);
+
   // --- Articles ---
   const [articleTitle, setArticleTitle] = useState("");
   const [articleExcerpt, setArticleExcerpt] = useState("");
@@ -179,7 +184,67 @@ export default function CmsDashboard(): React.ReactElement {
     },
   });
 
-  async function handleCreateMedia(e: React.FormEvent) {
+  async function handleBatchUpload() {
+    if (batchFiles.length === 0) { toast.error("Sélectionnez au moins une image"); return; }
+    setBatchUploading(true);
+    const progress = batchFiles.map((f) => ({ name: f.name, progress: 0, done: false, url: "" }));
+    setBatchProgress([...progress]);
+
+    const urls: string[] = [];
+    for (let i = 0; i < batchFiles.length; i++) {
+      const file = batchFiles[i];
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const res = await api.post("/uploads/single", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+          onUploadProgress: (pe: any) => {
+            if (pe.total) {
+              const pct = Math.round((pe.loaded * 100) / pe.total);
+              progress[i] = { ...progress[i], progress: pct };
+              setBatchProgress([...progress]);
+            }
+          },
+        });
+        const url = res.data?.data?.fileUrl || res.data?.fileUrl || "";
+        urls.push(url);
+        progress[i] = { ...progress[i], progress: 100, done: true, url };
+        setBatchProgress([...progress]);
+      } catch {
+        progress[i] = { ...progress[i], done: true, url: "ERREUR" };
+        setBatchProgress([...progress]);
+        toast.error(`Échec du téléchargement de ${file.name}`);
+      }
+    }
+
+    // Create FeaturedMedia records for all successful uploads
+    const successUrls = urls.filter(Boolean);
+    if (successUrls.length > 0) {
+      try {
+        for (const url of successUrls) {
+          await api.post("/cms/featured-media", {
+            title: mediaTitle.trim() || undefined,
+            description: mediaDesc.trim() || undefined,
+            imageUrl: url,
+            competitionId: mediaCompId || undefined,
+          });
+        }
+        toast.success(`${successUrls.length} image(s) ajoutée(s)`);
+        setMediaTitle("");
+        setMediaDesc("");
+        setMediaImageUrl("");
+        setMediaCompId("");
+        setBatchFiles([]);
+        setBatchProgress([]);
+        queryClient.invalidateQueries({ queryKey: ["cms-featured-media"] });
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || "Erreur lors de la création");
+      }
+    }
+    setBatchUploading(false);
+  }
+
+  async function handleCreateMedia(e: React.MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
     if (!mediaImageUrl) {
       toast.error("Une image est obligatoire");
@@ -476,79 +541,85 @@ export default function CmsDashboard(): React.ReactElement {
         <div>
           {/* Add form */}
           <div style={cardStyle}>
-            <h3 style={{ color: "var(--text)", marginBottom: 16 }}>Ajouter une image à la une</h3>
-            <form onSubmit={handleCreateMedia}>
-              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 12 }}>
-                <label className="field-label" style={{ minWidth: 200, flex: 1 }}>
-                  Titre (optionnel)
-                  <input
-                    type="text"
-                    value={mediaTitle}
-                    onChange={(e) => setMediaTitle(e.target.value)}
-                    placeholder="Titre de l'image"
-                    style={{
-                      background: "var(--bg)",
-                      color: "var(--text)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 12,
-                      padding: "11px 12px",
-                      width: "100%",
-                    }}
-                  />
-                </label>
-                <label className="field-label" style={{ minWidth: 200, flex: 1 }}>
-                  Description (optionnelle)
-                  <input
-                    type="text"
-                    value={mediaDesc}
-                    onChange={(e) => setMediaDesc(e.target.value)}
-                    placeholder="Description"
-                    style={{
-                      background: "var(--bg)",
-                      color: "var(--text)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 12,
-                      padding: "11px 12px",
-                      width: "100%",
-                    }}
-                  />
-                </label>
+            <h3 style={{ color: "var(--text)", marginBottom: 16 }}>Ajouter des images à la une</h3>
+
+            {/* Shared metadata fields */}
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 12 }}>
+              <label className="field-label" style={{ minWidth: 200, flex: 1 }}>
+                Titre commun (optionnel)
+                <input type="text" value={mediaTitle} onChange={(e) => setMediaTitle(e.target.value)} placeholder="Appliqué à toutes les images"
+                  style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 12px", width: "100%" }} />
+              </label>
+              <label className="field-label" style={{ minWidth: 200, flex: 1 }}>
+                Description commune (optionnelle)
+                <input type="text" value={mediaDesc} onChange={(e) => setMediaDesc(e.target.value)} placeholder="Appliquée à toutes les images"
+                  style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 12px", width: "100%" }} />
+              </label>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label className="field-label" style={{ minWidth: 200 }}>
+                Lier à une compétition (optionnel)
+                <select value={mediaCompId} onChange={(e) => setMediaCompId(e.target.value)}
+                  style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 12px", width: "100%", maxWidth: 400 }}>
+                  <option value="">— Aucune —</option>
+                  {(compsData || []).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+                </select>
+              </label>
+            </div>
+
+            {/* Single upload */}
+            <div style={{ marginBottom: 8, padding: "12px 16px", background: "var(--bg)", borderRadius: 12, border: "1px solid var(--border)" }}>
+              <p style={{ margin: "0 0 8px", color: "var(--muted)", fontSize: "0.85rem", fontWeight: 600 }}>Upload Rapide (1 image)</p>
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <FileUpload label="Image" accept=".png,.jpg,.jpeg,.webp" onUploaded={setMediaImageUrl} currentUrl={mediaImageUrl || null} />
+                </div>
+                <button type="button" className="btn primary" onClick={handleCreateMedia} disabled={mediaSaving || !mediaImageUrl}>
+                  {mediaSaving ? "..." : "Ajouter"}
+                </button>
               </div>
-              <div style={{ marginBottom: 12 }}>
-                <label className="field-label" style={{ minWidth: 200 }}>
-                  Lier à une compétition (optionnel)
-                  <select
-                    value={mediaCompId}
-                    onChange={(e) => setMediaCompId(e.target.value)}
-                    style={{
-                      background: "var(--bg)",
-                      color: "var(--text)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 12,
-                      padding: "11px 12px",
-                      width: "100%",
-                      maxWidth: 400,
-                    }}
-                  >
-                    <option value="">— Aucune —</option>
-                    {(compsData || []).map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                <FileUpload
-                  label="Image <span style='color:var(--red)'>*</span>"
+            </div>
+
+            {/* Batch upload */}
+            <div style={{ padding: "12px 16px", background: "var(--bg)", borderRadius: 12, border: "1px solid var(--border)" }}>
+              <p style={{ margin: "0 0 8px", color: "var(--muted)", fontSize: "0.85rem", fontWeight: 600 }}>Upload par Lot (plusieurs images)</p>
+              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+                <input
+                  type="file"
                   accept=".png,.jpg,.jpeg,.webp"
-                  onUploaded={setMediaImageUrl}
-                  currentUrl={mediaImageUrl || null}
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    setBatchFiles(files);
+                    setBatchProgress([]);
+                  }}
+                  disabled={batchUploading}
+                  style={{ color: "var(--text)" }}
                 />
+                <button type="button" className="btn primary" onClick={handleBatchUpload} disabled={batchUploading || batchFiles.length === 0}>
+                  {batchUploading ? "Upload en cours..." : `Uploader ${batchFiles.length > 0 ? `(${batchFiles.length})` : ""}`}
+                </button>
               </div>
-              <button type="submit" className="btn primary" disabled={mediaSaving}>
-                {mediaSaving ? "Ajout..." : "Ajouter l'image"}
-              </button>
-            </form>
+
+              {/* Upload progress */}
+              {batchProgress.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 200, overflowY: "auto" }}>
+                  {batchProgress.map((p, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
+                      <span style={{ flex: 1, fontSize: "0.8rem", color: p.done && p.url === "ERREUR" ? "var(--red)" : "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {p.name}
+                      </span>
+                      <div style={{ width: 100, height: 6, background: "var(--border)", borderRadius: 3, overflow: "hidden", flexShrink: 0 }}>
+                        <div style={{ width: `${p.progress}%`, height: "100%", background: p.done && p.url === "ERREUR" ? "var(--red)" : "var(--green)", borderRadius: 3, transition: "width 0.2s" }} />
+                      </div>
+                      <span style={{ fontSize: "0.75rem", color: "var(--muted)", width: 35, textAlign: "right", flexShrink: 0 }}>
+                        {p.done ? (p.url === "ERREUR" ? "❌" : "✅") : `${p.progress}%`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* List */}

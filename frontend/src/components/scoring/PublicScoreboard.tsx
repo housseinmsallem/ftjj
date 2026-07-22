@@ -17,13 +17,13 @@ export default function PublicScoreboard({ externalState }: Props) {
   return (
     <div style={{ background: "#0a0a0a", color: "#fff", fontFamily: "'Inter', 'Roboto', sans-serif", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {/* Top Athlete Row */}
-      <AthleteRow athlete={top} isTop stalling={state.stallingTop} isDoubleStalling={isDoubleStalling} isWinner={state.winner.side === "top"} winMethod={state.winner.method} />
+      <AthleteRow athlete={top} isTop stalling={state.stallingTop} isDoubleStalling={isDoubleStalling} isWinner={state.winner?.side === "top"} winMethod={state.winner?.method} />
 
       {/* Divider */}
       <div style={{ height: 2, background: "#333" }} />
 
       {/* Bottom Athlete Row */}
-      <AthleteRow athlete={bottom} isTop={false} stalling={state.stallingBottom} isDoubleStalling={isDoubleStalling} isWinner={state.winner.side === "bottom"} winMethod={state.winner.method} />
+      <AthleteRow athlete={bottom} isTop={false} stalling={state.stallingBottom} isDoubleStalling={isDoubleStalling} isWinner={state.winner?.side === "bottom"} winMethod={state.winner?.method} />
 
       {/* Status Bar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", background: "#111", borderTop: "2px solid #333", marginTop: "auto" }}>

@@ -259,6 +259,30 @@ export default function ClubCompetitionRegistration(): React.ReactElement {
         </div>
       )}
 
+      {/* Registration closed message */}
+      {competition && !(competition as any).isRegistrationOpen ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "48px 24px",
+            background: "var(--panel)",
+            borderRadius: 12,
+            border: "1px solid var(--border)",
+          }}
+        >
+          <p
+            style={{
+              color: "var(--muted)",
+              fontSize: "1.1rem",
+              margin: 0,
+            }}
+          >
+            🔒 Les inscriptions sont fermées pour cette compétition (clôture
+            J-2).
+          </p>
+        </div>
+      ) : (
+      <>
       <div className="card">
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
@@ -477,6 +501,8 @@ export default function ClubCompetitionRegistration(): React.ReactElement {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

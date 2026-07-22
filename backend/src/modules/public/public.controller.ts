@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { PublicService } from './public.service';
 
@@ -56,6 +56,12 @@ export class PublicController {
   @ApiQuery({ name: 'q', required: false })
   async referees(@Query('q') search?: string) {
     return this.publicService.getReferees(search);
+  }
+
+  @Get('competitions/:id')
+  @ApiOperation({ summary: "Détail public d'une compétition" })
+  async competitionDetail(@Param('id') id: string) {
+    return this.publicService.getCompetitionDetail(id);
   }
 
   @Get('news')

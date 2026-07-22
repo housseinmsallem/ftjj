@@ -144,9 +144,9 @@ export default function AthleteExport(): React.ReactElement {
         </h3>
         <p className="muted" style={{ margin: 0 }}>
           Le fichier CSV exporté contient les colonnes : code, firstName, lastName,
-          dateOfBirth, ageDivision, weightCategory, nationality, gender,
-          identityDocumentType, identityDocumentUrl, birthCertificateUrl,
-          photoUrl, type, grade, clubId. Les colonnes ageDivision et
+            dateOfBirth, ageDivision, weightCategory, nationality, gender,
+            identityDocumentType, identityDocumentUrl, birthCertificateUrl,
+            achievements, photoUrl, type, grade, clubId. Les colonnes ageDivision et
           weightCategory sont calculées dynamiquement selon les règles JJIF. Ce
           format est compatible avec la fonction d'importation CSV.
         </p>

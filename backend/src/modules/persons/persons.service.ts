@@ -143,6 +143,7 @@ export class PersonsService {
       contractUrl,
       refereeDegreeAttestationUrl,
       specialization,
+      paymentReceiptUrl,
       ...personData
     } = dto;
 
@@ -152,6 +153,7 @@ export class PersonsService {
         code,
         clubId,
         dateOfBirth: new Date(personData.dateOfBirth),
+        paymentReceiptUrl: paymentReceiptUrl || null,
         // Create type-specific details
         ...(dto.type === PersonType.ATHLETE && {
           athleteDetails: {
@@ -220,12 +222,19 @@ export class PersonsService {
 
     const {
       grade,
-      weight,
       blackBeltAttestationUrl,
       coachingAttestationUrl,
       contractUrl,
       refereeDegreeAttestationUrl,
       specialization,
+      paymentReceiptUrl,
+      type,
+      dateOfBirth,
+      gender,
+      identityDocumentType,
+      clubId,
+      code,
+      achievements,
       ...personData
     } = dto;
 
@@ -233,16 +242,21 @@ export class PersonsService {
       where: { id },
       data: {
         ...personData,
+        ...(type !== undefined && { type }),
+        ...(dateOfBirth !== undefined && { dateOfBirth: new Date(dateOfBirth) }),
+        ...(gender !== undefined && { gender }),
+        ...(identityDocumentType !== undefined && { identityDocumentType }),
+        ...(clubId !== undefined && { clubId }),
+        ...(code !== undefined && { code }),
+        ...(achievements !== undefined && { achievements }),
+        ...(paymentReceiptUrl !== undefined && { paymentReceiptUrl }),
         // Update type-specific details
         ...(person.type === PersonType.ATHLETE &&
-          (grade !== undefined || weight !== undefined) && {
+          grade !== undefined && {
             athleteDetails: {
               upsert: {
-                create: { grade: grade || null, weight: weight || null },
-                update: {
-                  ...(grade !== undefined && { grade }),
-                  ...(weight !== undefined && { weight }),
-                },
+                create: { grade: grade || null },
+                update: { grade },
               },
             },
           }),
@@ -409,6 +423,11 @@ export class PersonsService {
             row.identityDocumentUrl || row.url_document || "",
           photoUrl: row.photoUrl || row.url_photo || null,
           grade: row.grade || row.ceinture || null,
+          achievements: (() => {
+            const raw = row.achievements || row.palmares || row["palmarès"] || "";
+            if (Array.isArray(raw)) return raw;
+            return raw.split(/[|;]/).map((s: string) => s.trim()).filter(Boolean);
+          })(),
           clubId,
         };
 
@@ -500,6 +519,7 @@ export class PersonsService {
       "identityDocumentUrl",
       "birthCertificateUrl",
       "photoUrl",
+      "achievements",
       "type",
       "grade",
       "clubId",
@@ -522,6 +542,7 @@ export class PersonsService {
         .map((h) => {
           if (h === "ageDivision") return ageDivision;
           if (h === "weightCategory") return weightCategory;
+          if (h === "achievements") return (p.achievements || []).join("|");
           if (h === "grade") return p.athleteDetails?.grade || "";
           const val = p[h];
           if (val instanceof Date) return val.toISOString().slice(0, 10);

@@ -23,6 +23,7 @@ interface RefereeFormData {
   photoUrl: string;
   grade: string;
   refereeDegreeAttestationUrl: string;
+  paymentReceiptUrl: string;
 }
 
 const emptyForm: RefereeFormData = {
@@ -36,6 +37,7 @@ const emptyForm: RefereeFormData = {
   photoUrl: "",
   grade: "",
   refereeDegreeAttestationUrl: "",
+  paymentReceiptUrl: "",
 };
 
 export default function ClubReferees(): React.ReactElement {
@@ -48,6 +50,7 @@ export default function ClubReferees(): React.ReactElement {
   const [form, setForm] = useState<RefereeFormData>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const {
     data: personsData,
@@ -56,10 +59,10 @@ export default function ClubReferees(): React.ReactElement {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["persons", "REFEREE", clubId],
+    queryKey: ["persons", "REFEREE", clubId, searchText],
     queryFn: async () => {
       const res = await api.get("/persons", {
-        params: { type: "REFEREE", clubId },
+        params: { type: "REFEREE", clubId, search: searchText || undefined },
       });
       return (((res.data as any)?.data ?? res.data) as Person[]) || [];
     },
@@ -88,6 +91,7 @@ export default function ClubReferees(): React.ReactElement {
       photoUrl: person.photoUrl || "",
       grade: person.grade || "",
       refereeDegreeAttestationUrl: ext.refereeDegreeAttestationUrl || "",
+      paymentReceiptUrl: ext.paymentReceiptUrl || "",
     });
     setModalOpen(true);
   }
@@ -119,6 +123,7 @@ export default function ClubReferees(): React.ReactElement {
       clubId,
       refereeDegreeAttestationUrl:
         form.refereeDegreeAttestationUrl || undefined,
+      paymentReceiptUrl: form.paymentReceiptUrl || undefined,
     };
 
     Object.keys(payload).forEach((k) => {
@@ -211,85 +216,6 @@ export default function ClubReferees(): React.ReactElement {
           </button>
         }
       />
-
-      <div className="table-card">
-        {persons.length === 0 ? (
-          <EmptyState
-            title="Aucun arbitre"
-            description="Aucun arbitre n'a encore été enregistré dans votre club."
-            action={
-              <button className="btn primary" onClick={openCreate}>
-                Ajouter un arbitre
-              </button>
-            }
-          />
-        ) : (
-          <div className="table-wrap">
-            <table className="smart-table">
-              <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>Date de naissance</th>
-                  <th>Nationalité</th>
-                  <th>Attestation</th>
-                  <th>Statut Licence</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {persons.map((p) => (
-                  <tr key={p._id || p.id}>
-                    <td>
-                      {p.firstName} {p.lastName}
-                    </td>
-                    <td>
-                      {p.dateOfBirth
-                        ? new Date(p.dateOfBirth).toLocaleDateString("fr-FR")
-                        : "—"}
-                    </td>
-                    <td>{p.nationality || "—"}</td>
-                    <td>
-                      {(p as any).refereeDegreeAttestationUrl ? (
-                        <a
-                          href={(p as any).refereeDegreeAttestationUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: "var(--red)", fontWeight: 600 }}
-                        >
-                          Voir
-                        </a>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
-                    <td>
-                      <StatusBadge
-                        status={(p as any).licenseStatus || "PENDING"}
-                      />
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className="btn primary"
-                          onClick={() => openEdit(p)}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          className="btn danger"
-                          onClick={() => setDeleteTarget(p)}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
 
       {/* Create / Edit Modal */}
       {modalOpen && (
@@ -457,6 +383,15 @@ export default function ClubReferees(): React.ReactElement {
                   currentUrl={form.refereeDegreeAttestationUrl || null}
                 />
               </div>
+              <div style={{ marginTop: 18 }}>
+                <FileUpload
+                  label="Reçu de paiement"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  maxSizeMB={5}
+                  onUploaded={(url) => setForm({ ...form, paymentReceiptUrl: url })}
+                  currentUrl={form.paymentReceiptUrl || null}
+                />
+              </div>
 
               <div
                 className="modal-actions"
@@ -482,6 +417,106 @@ export default function ClubReferees(): React.ReactElement {
           </div>
         </div>
       )}
+
+      <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Rechercher par nom..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{
+            background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: "10px 16px", fontSize: "0.9rem", width: 300,
+          }}
+        />
+        {searchText && (
+          <button className="btn ghost" onClick={() => setSearchText("")}>
+            ✕ Effacer
+          </button>
+        )}
+        <span className="muted" style={{ fontSize: "0.85rem" }}>
+          {persons.length} résultat{persons.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      <div className="table-card">
+        {persons.length === 0 ? (
+          <EmptyState
+            title="Aucun arbitre"
+            description="Aucun arbitre n'a encore été enregistré dans votre club."
+            action={
+              <button className="btn primary" onClick={openCreate}>
+                Ajouter un arbitre
+              </button>
+            }
+          />
+        ) : (
+          <div className="table-wrap">
+            <table className="smart-table">
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Date de naissance</th>
+                  <th>Nationalité</th>
+                  <th>Attestation</th>
+                  <th>Statut Licence</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {persons.map((p) => (
+                  <tr key={p._id || p.id}>
+                    <td>
+                      {p.firstName} {p.lastName}
+                    </td>
+                    <td>
+                      {p.dateOfBirth
+                        ? new Date(p.dateOfBirth).toLocaleDateString("fr-FR")
+                        : "—"}
+                    </td>
+                    <td>{p.nationality || "—"}</td>
+                    <td>
+                      {(p as any).refereeDegreeAttestationUrl ? (
+                        <a
+                          href={(p as any).refereeDegreeAttestationUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "var(--red)", fontWeight: 600 }}
+                        >
+                          Voir
+                        </a>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td>
+                      <StatusBadge
+                        status={(p as any).licenseStatus || "PENDING"}
+                      />
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button
+                          className="btn primary"
+                          onClick={() => openEdit(p)}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          className="btn danger"
+                          onClick={() => setDeleteTarget(p)}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Delete Confirm */}
       <ConfirmDialog

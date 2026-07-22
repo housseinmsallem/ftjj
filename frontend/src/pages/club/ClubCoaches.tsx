@@ -25,6 +25,7 @@ interface CoachFormData {
   blackBeltAttestationUrl: string;
   coachingAttestationUrl: string;
   contractUrl: string;
+  paymentReceiptUrl: string;
 }
 
 const emptyForm: CoachFormData = {
@@ -40,6 +41,7 @@ const emptyForm: CoachFormData = {
   blackBeltAttestationUrl: "",
   coachingAttestationUrl: "",
   contractUrl: "",
+  paymentReceiptUrl: "",
 };
 
 export default function ClubCoaches(): React.ReactElement {
@@ -52,6 +54,7 @@ export default function ClubCoaches(): React.ReactElement {
   const [form, setForm] = useState<CoachFormData>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const {
     data: personsData,
@@ -60,10 +63,10 @@ export default function ClubCoaches(): React.ReactElement {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["persons", "COACH", clubId],
+    queryKey: ["persons", "COACH", clubId, searchText],
     queryFn: async () => {
       const res = await api.get("/persons", {
-        params: { type: "COACH", clubId },
+        params: { type: "COACH", clubId, search: searchText || undefined },
       });
       return (((res.data as any)?.data ?? res.data) as Person[]) || [];
     },
@@ -94,6 +97,7 @@ export default function ClubCoaches(): React.ReactElement {
       blackBeltAttestationUrl: ext.blackBeltAttestationUrl || "",
       coachingAttestationUrl: ext.coachingAttestationUrl || "",
       contractUrl: ext.contractUrl || "",
+      paymentReceiptUrl: ext.paymentReceiptUrl || "",
     });
     setModalOpen(true);
   }
@@ -126,6 +130,7 @@ export default function ClubCoaches(): React.ReactElement {
       blackBeltAttestationUrl: form.blackBeltAttestationUrl || undefined,
       coachingAttestationUrl: form.coachingAttestationUrl || undefined,
       contractUrl: form.contractUrl || undefined,
+      paymentReceiptUrl: form.paymentReceiptUrl || undefined,
     };
 
     // Clean empty strings — let backend auto-assign clubId from JWT
@@ -231,70 +236,6 @@ export default function ClubCoaches(): React.ReactElement {
           </button>
         }
       />
-
-      <div className="table-card">
-        {persons.length === 0 ? (
-          <EmptyState
-            title="Aucun entraîneur"
-            description="Aucun entraîneur n'a encore été enregistré dans votre club."
-            action={
-              <button className="btn primary" onClick={openCreate}>
-                Ajouter un entraîneur
-              </button>
-            }
-          />
-        ) : (
-          <div className="table-wrap">
-            <table className="smart-table">
-              <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>Date de naissance</th>
-                  <th>Nationalité</th>
-                  <th>Statut Licence</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {persons.map((p) => (
-                  <tr key={p._id || p.id}>
-                    <td>
-                      {p.firstName} {p.lastName}
-                    </td>
-                    <td>
-                      {p.dateOfBirth
-                        ? new Date(p.dateOfBirth).toLocaleDateString("fr-FR")
-                        : "—"}
-                    </td>
-                    <td>{p.nationality || "—"}</td>
-                    <td>
-                      <StatusBadge
-                        status={(p as any).licenseStatus || "PENDING"}
-                      />
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className="btn primary"
-                          onClick={() => openEdit(p)}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          className="btn danger"
-                          onClick={() => setDeleteTarget(p)}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
 
       {/* Create / Edit Modal */}
       {modalOpen && (
@@ -484,6 +425,15 @@ export default function ClubCoaches(): React.ReactElement {
                   currentUrl={form.contractUrl || null}
                 />
               </div>
+              <div style={{ marginTop: 18 }}>
+                <FileUpload
+                  label="Reçu de paiement"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  maxSizeMB={5}
+                  onUploaded={(url) => setForm({ ...form, paymentReceiptUrl: url })}
+                  currentUrl={form.paymentReceiptUrl || null}
+                />
+              </div>
 
               <div
                 className="modal-actions"
@@ -509,6 +459,91 @@ export default function ClubCoaches(): React.ReactElement {
           </div>
         </div>
       )}
+
+      <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Rechercher par nom..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{
+            background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: "10px 16px", fontSize: "0.9rem", width: 300,
+          }}
+        />
+        {searchText && (
+          <button className="btn ghost" onClick={() => setSearchText("")}>
+            ✕ Effacer
+          </button>
+        )}
+        <span className="muted" style={{ fontSize: "0.85rem" }}>
+          {persons.length} résultat{persons.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      <div className="table-card">
+        {persons.length === 0 ? (
+          <EmptyState
+            title="Aucun entraîneur"
+            description="Aucun entraîneur n'a encore été enregistré dans votre club."
+            action={
+              <button className="btn primary" onClick={openCreate}>
+                Ajouter un entraîneur
+              </button>
+            }
+          />
+        ) : (
+          <div className="table-wrap">
+            <table className="smart-table">
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Date de naissance</th>
+                  <th>Nationalité</th>
+                  <th>Statut Licence</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {persons.map((p) => (
+                  <tr key={p._id || p.id}>
+                    <td>
+                      {p.firstName} {p.lastName}
+                    </td>
+                    <td>
+                      {p.dateOfBirth
+                        ? new Date(p.dateOfBirth).toLocaleDateString("fr-FR")
+                        : "—"}
+                    </td>
+                    <td>{p.nationality || "—"}</td>
+                    <td>
+                      <StatusBadge
+                        status={(p as any).licenseStatus || "PENDING"}
+                      />
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button
+                          className="btn primary"
+                          onClick={() => openEdit(p)}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          className="btn danger"
+                          onClick={() => setDeleteTarget(p)}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Delete Confirm */}
       <ConfirmDialog

@@ -1,161 +1,54 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
-import { io, Socket } from "socket.io-client";
-import { scoringApi } from "../services/api";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { publicApi } from "../services/api";
+import { getAgeDivisionLabel } from "../utils/formOptions";
 
-const SOCKET_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api"
-).replace("/api", "");
-
-interface SessionAthlete {
-  firstName?: string;
-  lastName?: string;
-  name?: string;
-  club?: { name?: string; shortName?: string } | string;
+interface CompItem {
+  id: string; _id?: string;
+  name: string; date: string; location?: string;
+  type?: string; ageDivisions?: string[];
+  posterUrl?: string; isClosed?: boolean;
+  isRegistrationOpen?: boolean;
+  _count?: { signups?: number; matches?: number };
 }
-
-interface LiveSession {
-  _id: string;
-  status: string;
-  timerState: string;
-  remainingSeconds: number;
-  winnerSide?: string | null;
-  winMethod?: string | null;
-  red: { score: number; advantages: number; penalties: number; warnings: number };
-  blue: { score: number; advantages: number; penalties: number; warnings: number };
-  fight?: {
-    redAthlete?: SessionAthlete;
-    blueAthlete?: SessionAthlete;
-  };
-  discipline?: string;
-  category?: string;
-  mat?: string;
-  round?: string;
-}
-
-function athleteName(athlete: SessionAthlete | undefined): string {
-  if (!athlete) return "Athlète FTJJ";
-  return (
-    `${athlete.firstName || ""} ${athlete.lastName || ""}`.trim() ||
-    athlete.name ||
-    "Athlète FTJJ"
-  );
-}
-
-function clubName(club: SessionAthlete["club"]): string {
-  if (!club) return "";
-  return typeof club === "string" ? club : club.name || club.shortName || "";
-}
-
-function formatTime(seconds: number): string {
-  const s = Math.max(0, Math.floor(seconds));
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-}
-
-const winMethodLabels: Record<string, string> = {
-  points: "Points",
-  submission: "Soumission",
-  decision: "Décision",
-  forfeit: "Forfait",
-  disqualification: "Disqualification",
-  draw: "Égalité",
-};
 
 export default function Live(): React.ReactElement {
-  const [sessions, setSessions] = useState<LiveSession[]>([]);
+  const [competitions, setCompetitions] = useState<CompItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const navigate = useNavigate();
 
-  async function load(): Promise<void> {
-    try {
-      const data = await scoringApi.listPublicSessions();
-      setSessions(Array.isArray(data) ? data : []);
-    } catch {
-      setSessions([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Initial load + WebSocket
   useEffect(() => {
-    load();
-    const socket = io(SOCKET_URL, {
-      transports: ["websocket", "polling"],
-      reconnection: true,
-    });
-
-    socket.on("public:scoring:update", (updated: any) => {
-      setSessions((prev) =>
-        prev.map((s) => {
-          if (String(s._id) === String(updated.sessionId)) {
-            return {
-              ...s,
-              status: updated.status,
-              timerState: updated.timerState,
-              remainingSeconds: updated.remainingSeconds,
-              winnerSide: updated.winnerSide,
-              winMethod: updated.winMethod,
-              red: { ...s.red, score: updated.redScore },
-              blue: { ...s.blue, score: updated.blueScore },
-            };
-          }
-          return s;
-        }),
-      );
-    });
-
-    socket.on("scoring:sessionCreated", () => load());
-    socket.on("scoring:validated", () => load());
-    socket.on("dashboard:scoring:update", () => load());
-
-    return () => {
-      socket.removeAllListeners();
-      if (socket.connected) {
-        socket.disconnect();
-      }
-    };
+    publicApi.competitions()
+      .then((res: any) => {
+        const list = res?.data || res || [];
+        setCompetitions(Array.isArray(list) ? list : []);
+      })
+      .catch(() => setCompetitions([]))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Local countdown for live sessions
-  useEffect(() => {
-    timerRef.current = setInterval(() => {
-      setSessions((prev) =>
-        prev.map((s) => {
-          if (
-            s.timerState === "running" &&
-            s.status === "live" &&
-            s.remainingSeconds > 0
-          ) {
-            return { ...s, remainingSeconds: s.remainingSeconds - 1 };
-          }
-          return s;
-        }),
-      );
-    }, 1000);
+  const now = new Date();
+  const upcoming = competitions.filter(c => !c.isClosed && new Date(c.date) >= now);
+  const finished = competitions.filter(c => c.isClosed || new Date(c.date) < now);
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []);
-
-  const liveSessions = useMemo(
-    () => sessions.filter((s) => s.status === "live" || s.status === "paused"),
-    [sessions],
-  );
-
-  const finishedSessions = useMemo(
-    () =>
-      sessions.filter(
-        (s) => s.status === "finished" || s.status === "validated",
-      ),
-    [sessions],
-  );
-
-  const upcomingSessions = useMemo(
-    () => sessions.filter((s) => s.status === "waiting"),
-    [sessions],
+  const renderCard = (c: CompItem) => (
+    <article key={c.id || c._id} className="surface-card competition-card"
+      onClick={() => navigate(`/en-direct/${c.id || c._id}`)}
+      style={{ cursor: "pointer" }}>
+      {c.posterUrl && <img src={c.posterUrl} alt="" style={{ width: "100%", height: 140, objectFit: "cover", borderRadius: 12, marginBottom: 12 }} />}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+        <span className="feature-chip">{c.type || "Open"}</span>
+        {(c.ageDivisions || []).slice(0, 2).map((d: string) => (
+          <span key={d} className="feature-chip">{getAgeDivisionLabel(d)}</span>
+        ))}
+      </div>
+      <h3>{c.name}</h3>
+      <p>{c.location || "Lieu à confirmer"}</p>
+      <div className="story-meta">
+        <span>{new Date(c.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</span>
+        <span>{c._count?.signups || 0} inscrits · {c._count?.matches || 0} matchs</span>
+      </div>
+    </article>
   );
 
   return (
@@ -163,212 +56,35 @@ export default function Live(): React.ReactElement {
       <section className="public-hero-banner public-hero-live">
         <div className="section-inner public-hero-grid">
           <div>
-            <p className="eyebrow">Centre live FTJJ</p>
-            <h1>Suivez les tatamis en temps réel</h1>
-            <p className="hero-copy">
-              Scores, chronomètre, avantages et pénalités — suivez chaque combat
-              en direct avec les mises à jour instantanées.
-            </p>
-          </div>
-          <div className="surface-card hero-aside">
             <p className="eyebrow">En direct</p>
-            <h2>
-              {liveSessions.length} combat{liveSessions.length !== 1 ? "s" : ""}{" "}
-              en cours
-            </h2>
-            <p>
-              {liveSessions.map((s) => s.mat || "Tatami").join(", ") ||
-                "Aucun combat en cours"}
-            </p>
+            <h1>Compétitions, brackets et scores en temps réel</h1>
+            <p className="hero-copy">Suivez les compétitions en cours, consultez les brackets et regardez les matchs en direct.</p>
           </div>
         </div>
       </section>
-
       <section className="public-section">
         <div className="section-inner">
-          {loading && (
-            <p className="text-center muted">Chargement des sessions...</p>
-          )}
-
-          {/* Live fights */}
-          {liveSessions.length > 0 && (
-            <div className="live-fights-section">
-              <h2>🔴 En cours</h2>
-              {liveSessions.map((session) => {
-                const fight = session.fight || {};
-                const isRedWinner = session.winnerSide === "red";
-                const isBlueWinner = session.winnerSide === "blue";
-
-                return (
-                  <div key={session._id} className="live-fight-card card">
-                    <div className="live-fight-header">
-                      <span className="live-chip">
-                        {session.mat || "Tatami"}
-                      </span>
-                      <span className="live-chip">
-                        {session.discipline || "NEWAZA"}
-                      </span>
-                      <span className="live-chip live-status">
-                        {session.timerState === "running"
-                          ? "▶ LIVE"
-                          : session.timerState === "paused"
-                            ? "⏸ PAUSE"
-                            : session.timerState === "doctor_time"
-                              ? "🩺 MÉDECIN"
-                              : session.timerState}
-                      </span>
-                    </div>
-
-                    <section className="live-board public-live">
-                      <div
-                        className={`score-card red ${isRedWinner ? "winner" : ""}`}
-                      >
-                        <span>{athleteName(fight.redAthlete)}</span>
-                        <strong>{session.red?.score || 0}</strong>
-                        <div className="score-details">
-                          <span>Av: {session.red?.advantages || 0}</span>
-                          <span>Pén: {session.red?.penalties || 0}</span>
-                          {(session.red?.warnings || 0) > 0 && (
-                            <span className="warning-indicator">
-                              ⚠ {session.red.warnings}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="timer-card">
-                        <span>{session.mat || "Tatami"}</span>
-                        <strong
-                          className={
-                            session.timerState === "running" &&
-                            session.remainingSeconds <= 30
-                              ? "urgent"
-                              : ""
-                          }
-                        >
-                          {formatTime(session.remainingSeconds)}
-                        </strong>
-                        <small>
-                          {session.category || ""}{" "}
-                          {session.round ? `— ${session.round}` : ""}
-                        </small>
-                      </div>
-
-                      <div
-                        className={`score-card blue ${isBlueWinner ? "winner" : ""}`}
-                      >
-                        <span>{athleteName(fight.blueAthlete)}</span>
-                        <strong>{session.blue?.score || 0}</strong>
-                        <div className="score-details">
-                          <span>Av: {session.blue?.advantages || 0}</span>
-                          <span>Pén: {session.blue?.penalties || 0}</span>
-                          {(session.blue?.warnings || 0) > 0 && (
-                            <span className="warning-indicator">
-                              ⚠ {session.blue.warnings}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </section>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Upcoming */}
-          {upcomingSessions.length > 0 && (
-            <div className="feature-grid live-match-grid">
-              {upcomingSessions.map((session) => {
-                const fight = session.fight || {};
-                return (
-                  <article
-                    className="surface-card match-card"
-                    key={session._id}
-                  >
-                    <span className="feature-chip">
-                      {session.mat || "Tatami"}
-                    </span>
-                    <h3>{session.discipline || "NEWAZA"}</h3>
-                    <p>{session.category || "Combat officiel"}</p>
-                    <div className="match-score-line">
-                      <strong>{athleteName(fight.redAthlete)}</strong>
-                    </div>
-                    <div className="match-score-line">
-                      <strong>{athleteName(fight.blueAthlete)}</strong>
-                    </div>
-                    <div className="story-meta">
-                      <span>{session.round || "Tableau principal"}</span>
-                      <span>⏳ En attente</span>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Finished */}
-          {finishedSessions.length > 0 && (
+          {loading && <p style={{ textAlign: "center", padding: "3rem" }}>Chargement...</p>}
+          {!loading && (
             <>
-              <h2>✅ Résultats récents</h2>
-              <div className="feature-grid live-match-grid">
-                {finishedSessions.map((session) => {
-                  const fight = session.fight || {};
-                  const winnerLabel =
-                    session.winnerSide === "red"
-                      ? athleteName(fight.redAthlete)
-                      : session.winnerSide === "blue"
-                        ? athleteName(fight.blueAthlete)
-                        : "Égalité";
-
-                  return (
-                    <article
-                      className={`surface-card match-card ${session.winnerSide === "red" ? "red-won" : session.winnerSide === "blue" ? "blue-won" : ""}`}
-                      key={session._id}
-                    >
-                      <span className="feature-chip">
-                        {session.mat || "Tatami"}
-                      </span>
-                      <h3>🏆 {winnerLabel}</h3>
-                      <p>
-                        {session.discipline || "NEWAZA"} ·{" "}
-                        {session.category || ""}
-                      </p>
-                      <div className="match-score-line">
-                        <strong>{athleteName(fight.redAthlete)}</strong>
-                        <em>{session.red?.score || 0}</em>
-                      </div>
-                      <div className="match-score-line">
-                        <strong>{athleteName(fight.blueAthlete)}</strong>
-                        <em>{session.blue?.score || 0}</em>
-                      </div>
-                      <div className="story-meta">
-                        <span>
-                          {winMethodLabels[session.winMethod || ""] ||
-                            session.winMethod ||
-                            "Points"}
-                        </span>
-                        <span>
-                          {session.status === "validated"
-                            ? "Validé"
-                            : "En attente"}
-                        </span>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
+              {upcoming.length > 0 && (
+                <div style={{ marginBottom: 40 }}>
+                  <div className="section-lead"><p className="eyebrow">🔴 En cours / À venir</p><h2>Compétitions actives</h2></div>
+                  <div className="feature-grid competitions-grid">{upcoming.map(renderCard)}</div>
+                </div>
+              )}
+              {finished.length > 0 && (
+                <div>
+                  <div className="section-lead"><p className="eyebrow">✅ Terminées</p><h2>Compétitions passées</h2></div>
+                  <div className="feature-grid competitions-grid">{finished.map(renderCard)}</div>
+                </div>
+              )}
+              {competitions.length === 0 && (
+                <div className="surface-card" style={{ textAlign: "center", padding: "3rem" }}>
+                  <h2>Aucune compétition disponible</h2><p>Revenez bientôt.</p>
+                </div>
+              )}
             </>
-          )}
-
-          {!loading && sessions.length === 0 && (
-            <div className="empty-state">
-              <h2>Aucun combat en cours</h2>
-              <p>
-                Revenez pendant une compétition pour suivre les scores en
-                direct.
-              </p>
-            </div>
           )}
         </div>
       </section>

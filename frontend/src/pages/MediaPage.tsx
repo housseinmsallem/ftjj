@@ -33,6 +33,8 @@ export default function MediaPage(): React.ReactElement {
   const [documents, setDocuments] = useState<CmsDocument[]>([]);
   const [featured, setFeatured] = useState<FeaturedMediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   useEffect(() => {
     async function fetchData() {
@@ -94,38 +96,190 @@ export default function MediaPage(): React.ReactElement {
         </div>
       </section>
 
-      {/* Featured images */}
+      {/* Featured images gallery */}
       {!loading && featured.length > 0 && (
         <section className="public-section">
           <div className="section-inner">
             <div className="section-lead">
               <p className="eyebrow">Galerie</p>
-              <h2>Images à la une</h2>
+              <h2>Photos des compétitions</h2>
             </div>
-            <div className="feature-grid editorial-three">
-              {featured.map((item) => (
-                <article className="surface-card media-card" key={item.id}>
-                  <img
-                    src={item.imageUrl}
-                    alt={item.title || ""}
-                    style={{
-                      width: "100%",
-                      height: "200px",
-                      objectFit: "cover",
-                      borderRadius: "8px",
-                      marginBottom: "0.75rem",
-                    }}
-                  />
-                  {item.title && <h3>{item.title}</h3>}
-                  {item.description && <p>{item.description}</p>}
-                  {item.competition?.name && (
-                    <p className="muted">🏆 {item.competition.name}</p>
-                  )}
-                </article>
+
+            {/* Main gallery container */}
+            <div
+              onClick={() => { setLightboxIndex(0); setLightboxOpen(true); }}
+              style={{
+                position: "relative",
+                borderRadius: 16,
+                overflow: "hidden",
+                cursor: "pointer",
+                marginBottom: 16,
+                background: "#0f172a",
+              }}
+            >
+              <img
+                src={featured[0].imageUrl}
+                alt={featured[0].title || ""}
+                style={{ width: "100%", maxHeight: 480, objectFit: "cover", display: "block" }}
+              />
+              <div style={{
+                position: "absolute", bottom: 0, left: 0, right: 0,
+                padding: "20px 24px",
+                background: "linear-gradient(transparent, rgba(0,0,0,0.85))",
+                color: "#fff",
+              }}>
+                <h3 style={{ margin: "0 0 4px", font: "700 20px/1.2 var(--public-display)", textTransform: "uppercase" }}>
+                  {featured[0].title || "Galerie photos FTJJ"}
+                </h3>
+                {featured[0].competition?.name && (
+                  <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.8 }}>🏆 {featured[0].competition.name}</p>
+                )}
+              </div>
+              <div style={{
+                position: "absolute", top: 16, right: 16,
+                padding: "6px 14px", borderRadius: 999,
+                background: "rgba(0,0,0,0.6)", color: "#fff",
+                font: "700 12px/1 var(--public-display)", letterSpacing: "0.05em",
+              }}>
+                +{featured.length - 1} photos
+              </div>
+            </div>
+
+            {/* Thumbnail strip */}
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8 }}>
+              {featured.map((item, i) => (
+                <div
+                  key={item.id}
+                  onClick={() => { setLightboxIndex(i); setLightboxOpen(true); }}
+                  style={{
+                    flexShrink: 0, width: 90, height: 64, borderRadius: 8, overflow: "hidden",
+                    cursor: "pointer", border: i === 0 ? "2px solid #d51332" : "2px solid transparent",
+                    opacity: i === 0 ? 1 : 0.6, transition: "opacity 0.2s",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+                  onMouseLeave={(e) => { if (i !== 0) (e.currentTarget as HTMLElement).style.opacity = "0.6"; }}
+                >
+                  <img src={item.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </div>
               ))}
             </div>
           </div>
         </section>
+      )}
+
+      {/* ===== LIGHTBOX ===== */}
+      {lightboxOpen && (
+        <div
+          onClick={() => setLightboxOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.95)", display: "flex",
+            flexDirection: "column", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setLightboxOpen(false)}
+            style={{
+              position: "absolute", top: 20, right: 24, zIndex: 10,
+              background: "none", border: "none", color: "#fff", fontSize: "2rem",
+              cursor: "pointer", opacity: 0.7,
+            }}
+          >
+            ✕
+          </button>
+
+          {/* Counter */}
+          <div style={{
+            position: "absolute", top: 24, left: 24, zIndex: 10,
+            color: "rgba(255,255,255,0.7)", font: "700 13px/1 var(--public-display)",
+            letterSpacing: "0.05em",
+          }}>
+            {lightboxIndex + 1} / {featured.length}
+          </div>
+
+          {/* Image */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "90vw", maxHeight: "75vh", display: "flex", flexDirection: "column", alignItems: "center" }}
+          >
+            <img
+              src={featured[lightboxIndex]?.imageUrl}
+              alt=""
+              style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain", borderRadius: 8 }}
+            />
+            {/* Info bar */}
+            <div style={{ textAlign: "center", color: "#fff", marginTop: 16, maxWidth: 600 }}>
+              {featured[lightboxIndex]?.title && (
+                <h3 style={{ margin: "0 0 4px", font: "700 16px/1.2 var(--public-display)", textTransform: "uppercase", color: "#fff" }}>
+                  {featured[lightboxIndex].title}
+                </h3>
+              )}
+              {featured[lightboxIndex]?.description && (
+                <p style={{ margin: "0 0 4px", fontSize: "0.85rem", color: "rgba(255,255,255,0.65)" }}>
+                  {featured[lightboxIndex].description}
+                </p>
+              )}
+              {featured[lightboxIndex]?.competition?.name && (
+                <p style={{ margin: 0, fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
+                  🏆 {featured[lightboxIndex].competition.name}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Navigation arrows */}
+          {lightboxIndex > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex - 1); }}
+              style={{
+                position: "absolute", left: 24, top: "50%", transform: "translateY(-50%)",
+                background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
+                color: "#fff", fontSize: "2rem", width: 50, height: 50, borderRadius: "50%",
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              ‹
+            </button>
+          )}
+          {lightboxIndex < featured.length - 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex + 1); }}
+              style={{
+                position: "absolute", right: 24, top: "50%", transform: "translateY(-50%)",
+                background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
+                color: "#fff", fontSize: "2rem", width: 50, height: 50, borderRadius: "50%",
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              ›
+            </button>
+          )}
+
+          {/* Thumbnail strip at bottom */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute", bottom: 24, display: "flex", gap: 6,
+              overflowX: "auto", maxWidth: "90vw", padding: "0 16px",
+            }}
+          >
+            {featured.map((item, i) => (
+              <div
+                key={item.id}
+                onClick={() => setLightboxIndex(i)}
+                style={{
+                  flexShrink: 0, width: 60, height: 44, borderRadius: 6,
+                  overflow: "hidden", cursor: "pointer",
+                  border: i === lightboxIndex ? "2px solid #d51332" : "2px solid rgba(255,255,255,0.2)",
+                  opacity: i === lightboxIndex ? 1 : 0.5, transition: "opacity 0.2s",
+                }}
+              >
+                <img src={item.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Documents grouped by category */}

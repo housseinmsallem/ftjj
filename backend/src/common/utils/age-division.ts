@@ -1,4 +1,4 @@
-import { AgeDivision, Gender } from '@prisma/client';
+export type AgeDivision = 'U6' | 'U8' | 'U10' | 'U12' | 'U14' | 'U16' | 'U18' | 'U21' | 'ADULTS' | 'MASTERS_1' | 'MASTERS_2' | 'MASTERS_3' | 'MASTERS_4';
 
 // ──────────────────────────────────────────────
 // Age Division computation
@@ -150,6 +150,48 @@ export function getWeightCategories(
   const result = cats.map(l => `-${l}kg`);
   result.push(`+${cats[cats.length - 1]}kg`);
   return result;
+}
+
+/** Ordered list of age divisions from youngest to oldest */
+export const AGE_DIVISION_ORDER: AgeDivision[] = [
+  'U6', 'U8', 'U10', 'U12', 'U14', 'U16', 'U18', 'U21',
+  'ADULTS', 'MASTERS_1', 'MASTERS_2', 'MASTERS_3', 'MASTERS_4',
+];
+
+/** Ordered list of belt groups from lowest to highest */
+export const BELT_ORDER = ['Blanche', 'Bleue', 'Violette', 'Marron', 'Noire'];
+
+/**
+ * Returns the next higher age division, or null if already at the highest.
+ */
+export function getNextHigherAgeDivision(current: AgeDivision): AgeDivision | null {
+  const idx = AGE_DIVISION_ORDER.indexOf(current);
+  if (idx === -1 || idx === AGE_DIVISION_ORDER.length - 1) return null;
+  return AGE_DIVISION_ORDER[idx + 1];
+}
+
+/**
+ * Returns the next higher weight category label (e.g. "-69kg" → "-77kg")
+ * for the given gender and age division, or null if already at the highest.
+ */
+export function getNextHigherWeightCategory(
+  currentCategory: string,
+  gender: string,
+  ageDivision: string | AgeDivision,
+): string | null {
+  const cats = getWeightCategories(ageDivision, gender);
+  const idx = cats.indexOf(currentCategory);
+  if (idx === -1 || idx === cats.length - 1) return null;
+  return cats[idx + 1];
+}
+
+/**
+ * Returns the next higher belt group, or null if already at the highest.
+ */
+export function getNextHigherBelt(current: string): string | null {
+  const idx = BELT_ORDER.indexOf(current);
+  if (idx === -1 || idx === BELT_ORDER.length - 1) return null;
+  return BELT_ORDER[idx + 1];
 }
 
 export function getBeltGroup(grade: string): string {

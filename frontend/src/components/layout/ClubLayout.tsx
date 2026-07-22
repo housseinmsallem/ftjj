@@ -22,8 +22,8 @@ const clubNavItems = [
 const sidebarStyle: React.CSSProperties = {
   position: "sticky",
   top: 0,
-  width: 250,
-  minWidth: 250,
+  width: 210,
+  minWidth: 210,
   height: "calc(100vh - 64px)",
   overflowY: "auto",
   backgroundColor: "var(--panel)",
@@ -108,7 +108,8 @@ const logoutBtnStyle: React.CSSProperties = {
 
 const mainStyle: React.CSSProperties = {
   flex: 1,
-  padding: 24,
+  padding: "16px 20px",
+  minWidth: 0,
   minHeight: "calc(100vh - 64px)",
   backgroundColor: "var(--bg)",
 };

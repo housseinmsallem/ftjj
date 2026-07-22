@@ -7,7 +7,9 @@ import PageHeader from "../../components/shared/PageHeader";
 import LoadingSpinner from "../../components/shared/LoadingSpinner";
 import EmptyState from "../../components/shared/EmptyState";
 import StatusBadge from "../../components/shared/StatusBadge";
+
 import LicensePrintWrapper from "../../components/licences/LicensePrintWrapper";
+
 import type { License, Person, Pricing } from "../../types";
 
 export default function ClubLicenses(): React.ReactElement {
@@ -233,7 +235,6 @@ export default function ClubLicenses(): React.ReactElement {
         )}
       </div>
 
-      {/* Print License Modal */}
       {printLicense && (
         <div className="modal-overlay" onClick={() => setPrintLicense(null)}>
           <div
@@ -253,6 +254,7 @@ export default function ClubLicenses(): React.ReactElement {
           </div>
         </div>
       )}
+
     </div>
   );
 }

@@ -57,10 +57,20 @@ export class CreatePersonDto {
   @IsString()
   birthCertificateUrl?: string;
 
+  @ApiProperty({ required: false, example: "/uploads/documents/recu-123.pdf" })
+  @IsOptional()
+  @IsString()
+  paymentReceiptUrl?: string;
+
   @ApiProperty({ required: false, example: "/uploads/photos/photo-123.jpg" })
   @IsOptional()
   @IsString()
   photoUrl?: string;
+
+  @ApiProperty({ required: false, example: ["Champion National 2025"] })
+  @IsOptional()
+  @IsString({ each: true })
+  achievements?: string[];
 
   @ApiProperty({
     description: "ID du club (optionnel pour les propriétaires de club)",
@@ -142,11 +152,12 @@ export class UpdatePersonDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  grade?: string;
+  paymentReceiptUrl?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
-  weight?: number;
+  @IsString()
+  grade?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -172,6 +183,41 @@ export class UpdatePersonDto {
   @IsOptional()
   @IsString()
   specialization?: string;
+
+  @ApiProperty({ required: false, enum: PersonType })
+  @IsOptional()
+  @IsEnum(PersonType, { message: "Le type de personne est invalide" })
+  type?: PersonType;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsDateString({}, { message: "La date de naissance doit être une date valide" })
+  dateOfBirth?: string;
+
+  @ApiProperty({ required: false, enum: Gender })
+  @IsOptional()
+  @IsEnum(Gender, { message: "Le genre doit être MALE ou FEMALE" })
+  gender?: Gender;
+
+  @ApiProperty({ required: false, enum: IdentityDocumentType })
+  @IsOptional()
+  @IsEnum(IdentityDocumentType, { message: "Le type de document d'identité est invalide" })
+  identityDocumentType?: IdentityDocumentType;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID("4", { message: "L'ID du club est invalide" })
+  clubId?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  code?: string;
+
+  @ApiProperty({ required: false, example: ["Champion National 2025"] })
+  @IsOptional()
+  @IsString({ each: true })
+  achievements?: string[];
 }
 
 export class BatchCreatePersonDto {

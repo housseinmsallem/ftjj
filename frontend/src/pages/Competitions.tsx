@@ -37,6 +37,7 @@ interface CompetitionItem {
   splitByBelt?: boolean;
   ageDivision?: string;
   posterUrl?: string;
+  isRegistrationOpen?: boolean;
 }
 
 type DetailTab = "overview" | "signups" | "documents" | "matches";
@@ -64,8 +65,9 @@ export default function Competitions(): React.ReactElement {
               description: item.description || "",
               type: item.type || "Open",
               splitByBelt: item.splitByBelt || false,
-              ageDivision: item.ageDivision || "ADULTS",
+              ageDivision: Array.isArray(item.ageDivisions) ? item.ageDivisions[0] : (item.ageDivision || "ADULTS"),
               posterUrl: item.posterUrl || "",
+              isRegistrationOpen: item.isRegistrationOpen ?? (item.date ? new Date(item.date) > new Date() : true),
             }))
           : [];
         setCompetitions(mapped);
@@ -97,8 +99,7 @@ export default function Competitions(): React.ReactElement {
     setDetail(null);
   }
 
-  const isRegistrationOpen = (comp: CompetitionItem) =>
-    comp.date ? new Date(comp.date) > new Date() : true;
+  const isRegistrationOpen = (comp: CompetitionItem) => comp.isRegistrationOpen ?? (comp.date ? new Date(comp.date) > new Date() : true);
 
   const approvedSignups =
     detail?.signups?.filter((s: any) => s.status === "APPROVED") || [];
@@ -131,10 +132,8 @@ export default function Competitions(): React.ReactElement {
           <span className="feature-chip">
             {getAgeDivisionLabel(comp.ageDivision || "ADULTS")}
           </span>
-          <span className="competition-status-pill">
-            {isRegistrationOpen(comp)
-              ? "Inscriptions ouvertes"
-              : "Terminée"}
+          <span className="competition-status-pill" style={comp.isRegistrationOpen ? {} : { background: "rgba(100,116,139,0.15)", color: "#94a3b8" }}>
+            {comp.isRegistrationOpen ? "✅ Inscriptions ouvertes" : "🔒 Inscriptions fermées"}
           </span>
         </div>
         {comp.posterUrl && (
@@ -614,13 +613,13 @@ export default function Competitions(): React.ReactElement {
                               {liveMatches.map((m: any) => (
                                 <div key={m._id || m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", border: "1px solid #e2e8f0", borderRadius: 8, marginBottom: 6 }}>
                                   <span style={{ fontWeight: 600, color: "#d51332", flex: 1, textAlign: "right" }}>
-                                    {m.redCorner?.firstName} {m.redCorner?.lastName}
+                                    { m.redCorner ? `${m.redCorner.firstName || "—"} ${m.redCorner.lastName || ""}` : "À déterminer" }
                                   </span>
                                   <span style={{ margin: "0 12px", fontWeight: 800, color: "#64748b" }}>
                                     {m.redScore || 0} - {m.blueScore || 0}
                                   </span>
                                   <span style={{ fontWeight: 600, color: "#2563eb", flex: 1 }}>
-                                    {m.blueCorner?.firstName} {m.blueCorner?.lastName}
+                                    { m.blueCorner ? `${m.blueCorner.firstName || "—"} ${m.blueCorner.lastName || ""}` : "À déterminer" }
                                   </span>
                                   <span style={{ marginLeft: 8, fontSize: "0.7rem", color: "#94a3b8" }}>T{m.matNumber}</span>
                                 </div>
@@ -636,11 +635,11 @@ export default function Competitions(): React.ReactElement {
                               {upcomingMatches.map((m: any) => (
                                 <div key={m._id || m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", border: "1px solid #f1f5f9", borderRadius: 8, marginBottom: 4 }}>
                                   <span style={{ color: "#475569", flex: 1, textAlign: "right", fontSize: "0.85rem" }}>
-                                    {m.redCorner?.firstName} {m.redCorner?.lastName}
+                                    { m.redCorner ? `${m.redCorner.firstName || "—"} ${m.redCorner.lastName || ""}` : "À déterminer" }
                                   </span>
                                   <span style={{ margin: "0 12px", color: "#94a3b8", fontWeight: 600 }}>VS</span>
                                   <span style={{ color: "#475569", flex: 1, fontSize: "0.85rem" }}>
-                                    {m.blueCorner?.firstName} {m.blueCorner?.lastName}
+                                    { m.blueCorner ? `${m.blueCorner.firstName || "—"} ${m.blueCorner.lastName || ""}` : "À déterminer" }
                                   </span>
                                 </div>
                               ))}
@@ -655,13 +654,13 @@ export default function Competitions(): React.ReactElement {
                               {finishedMatches.map((m: any) => (
                                 <div key={m._id || m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", border: "1px solid #f1f5f9", borderRadius: 8, marginBottom: 4 }}>
                                   <span style={{ color: m.winnerSide === "red" ? "#d51332" : "#475569", flex: 1, textAlign: "right", fontSize: "0.85rem", fontWeight: m.winnerSide === "red" ? 600 : 400 }}>
-                                    {m.redCorner?.firstName} {m.redCorner?.lastName}
+                                    { m.redCorner ? `${m.redCorner.firstName || "—"} ${m.redCorner.lastName || ""}` : "À déterminer" }
                                   </span>
                                   <span style={{ margin: "0 12px", color: "#94a3b8", fontSize: "0.8rem" }}>
                                     {m.redScore} - {m.blueScore}
                                   </span>
                                   <span style={{ color: m.winnerSide === "blue" ? "#2563eb" : "#475569", flex: 1, fontSize: "0.85rem", fontWeight: m.winnerSide === "blue" ? 600 : 400 }}>
-                                    {m.blueCorner?.firstName} {m.blueCorner?.lastName}
+                                    { m.blueCorner ? `${m.blueCorner.firstName || "—"} ${m.blueCorner.lastName || ""}` : "À déterminer" }
                                   </span>
                                 </div>
                               ))}

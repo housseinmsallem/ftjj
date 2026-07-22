@@ -108,6 +108,7 @@ export interface Person {
   club?: ClubRef;
   grade?: string;
   birthCertificateUrl?: string;
+  achievements?: string[];
   athleteDetails?: {
     grade?: string | null;
     weight?: number | null;
@@ -126,6 +127,7 @@ export interface Competition {
   type?: string;
   splitByBelt?: boolean;
   ageDivision?: string;
+  ageDivisions?: string[];
   seasonYear?: number;
   posterUrl?: string;
   _count?: { signups?: number; matches?: number };

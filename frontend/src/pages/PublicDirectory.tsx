@@ -55,10 +55,14 @@ const meta: Record<string, DirectoryMetaConfig> = {
     ],
     details: [
       ["fullName", "Nom complet"],
+      ["dateOfBirth", "Date de naissance"],
+      ["ageDivision", "Division d'âge"],
+      ["nationality", "Nationalité"],
+      ["gender", "Genre"],
+      ["type", "Type"],
+      ["grade", "Grade"],
+      ["achievements", "Palmarès"],
       ["club.name", "Club"],
-      ["weight", "Poids"],
-      ["jiujitsuGrade", "Grade Jiu-Jitsu"],
-      ["newazaGrade", "Grade Newaza"],
     ],
   },
   coaches: {
@@ -114,6 +118,39 @@ function getValue(row: any, path: string): any {
   if (path === "jiujitsuGrade") return row.athleteDetails?.grade;
   if (path === "newazaGrade") return row.athleteDetails?.grade;
   if (path === "weight") return row.athleteDetails?.weight ?? row.weight;
+  if (path === "grade") return row.athleteDetails?.grade || row.grade || "--";
+  if (path === "ageDivision") {
+    if (!row.dateOfBirth) return "--";
+    const birthYear = new Date(row.dateOfBirth).getFullYear();
+    const seasonYear = 2026;
+    const age = seasonYear - birthYear;
+    if (age <= 5) return "U6";
+    if (age <= 7) return "U8";
+    if (age <= 9) return "U10";
+    if (age <= 11) return "U12";
+    if (age <= 13) return "U14";
+    if (age <= 15) return "U16";
+    if (age <= 17) return "U18";
+    if (age <= 20) return "U21";
+    if (age <= 34) return "Adultes";
+    if (age <= 39) return "Masters 1";
+    if (age <= 44) return "Masters 2";
+    if (age <= 49) return "Masters 3";
+    return "Masters 4";
+  }
+  if (path === "dateOfBirth") {
+    if (!row.dateOfBirth) return "--";
+    return new Date(row.dateOfBirth).toLocaleDateString("fr-FR");
+  }
+  if (path === "gender") {
+    if (row.gender === "MALE") return "Homme";
+    if (row.gender === "FEMALE") return "Femme";
+    return row.gender || "--";
+  }
+  if (path === "type") {
+    const labels: Record<string, string> = { ATHLETE: "Athlète", COACH: "Entraîneur", REFEREE: "Arbitre", TECHNICIAN: "Technicien" };
+    return labels[row.type] || row.type || "--";
+  }
   if (path.endsWith(".length")) {
     const base = path.replace(".length", "");
     const value = base
@@ -153,10 +190,19 @@ function subFor(row: any, type: string): string {
 
 function cardTags(row: any, type: string): string[] {
   if (type === "athletes") {
-    const licenseStatus =
-      row.licenses?.[0]?.status || row.licenseStatus || "Valide";
-    const grade = row.athleteDetails?.grade || "Non renseigne";
-    return [licenseStatus, `Grade: ${grade}`, row.nationality || "FTJJ"];
+    const grade = row.athleteDetails?.grade || "Non renseigné";
+    const gender = row.gender === "MALE" ? "Homme" : row.gender === "FEMALE" ? "Femme" : "";
+    const ageDiv = (() => {
+      if (!row.dateOfBirth) return "";
+      const age = 2026 - new Date(row.dateOfBirth).getFullYear();
+      if (age <= 5) return "U6"; if (age <= 7) return "U8"; if (age <= 9) return "U10";
+      if (age <= 11) return "U12"; if (age <= 13) return "U14"; if (age <= 15) return "U16";
+      if (age <= 17) return "U18"; if (age <= 20) return "U21";
+      if (age <= 34) return "Adultes"; if (age <= 39) return "Masters 1";
+      if (age <= 44) return "Masters 2"; if (age <= 49) return "Masters 3";
+      return "Masters 4";
+    })();
+    return [grade, gender, ageDiv].filter(Boolean);
   }
 
   if (type === "clubs") {
@@ -345,7 +391,11 @@ export default function PublicDirectory({
                 <article className="directory-card card" key={row._id || index}>
                   <div className="directory-card-header">
                     <div className="entity-avatar">
-                      {labelFor(row, type).slice(0, 2).toUpperCase()}
+                      {row.photoUrl ? (
+                        <img src={row.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                      ) : (
+                        labelFor(row, type).slice(0, 2).toUpperCase()
+                      )}
                     </div>
                     <div>
                       <h3>{labelFor(row, type)}</h3>
@@ -397,7 +447,11 @@ export default function PublicDirectory({
               </button>
               <div className="profile-head">
                 <div className="entity-avatar large">
-                  {labelFor(selected, type).slice(0, 2).toUpperCase()}
+                  {selected.photoUrl ? (
+                    <img src={selected.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                  ) : (
+                    labelFor(selected, type).slice(0, 2).toUpperCase()
+                  )}
                 </div>
                 <div>
                   <p className="eyebrow">Fiche officielle</p>

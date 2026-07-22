@@ -23,6 +23,7 @@ interface TechnicianFormData {
   photoUrl: string;
   grade: string;
   specialization: string;
+  paymentReceiptUrl: string;
 }
 
 const emptyForm: TechnicianFormData = {
@@ -36,6 +37,7 @@ const emptyForm: TechnicianFormData = {
   photoUrl: "",
   grade: "",
   specialization: "",
+  paymentReceiptUrl: "",
 };
 
 export default function ClubTechnicians(): React.ReactElement {
@@ -48,6 +50,7 @@ export default function ClubTechnicians(): React.ReactElement {
   const [form, setForm] = useState<TechnicianFormData>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const {
     data: personsData,
@@ -56,10 +59,10 @@ export default function ClubTechnicians(): React.ReactElement {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["persons", "TECHNICIAN", clubId],
+    queryKey: ["persons", "TECHNICIAN", clubId, searchText],
     queryFn: async () => {
       const res = await api.get("/persons", {
-        params: { type: "TECHNICIAN", clubId },
+        params: { type: "TECHNICIAN", clubId, search: searchText || undefined },
       });
       return (((res.data as any)?.data ?? res.data) as Person[]) || [];
     },
@@ -88,6 +91,7 @@ export default function ClubTechnicians(): React.ReactElement {
       photoUrl: person.photoUrl || "",
       grade: person.grade || "",
       specialization: ext.specialization || "",
+      paymentReceiptUrl: ext.paymentReceiptUrl || "",
     });
     setModalOpen(true);
   }
@@ -118,6 +122,7 @@ export default function ClubTechnicians(): React.ReactElement {
       grade: form.grade.trim(),
       clubId,
       specialization: form.specialization.trim() || undefined,
+      paymentReceiptUrl: form.paymentReceiptUrl || undefined,
     };
 
     Object.keys(payload).forEach((k) => {
@@ -210,72 +215,6 @@ export default function ClubTechnicians(): React.ReactElement {
           </button>
         }
       />
-
-      <div className="table-card">
-        {persons.length === 0 ? (
-          <EmptyState
-            title="Aucun technicien"
-            description="Aucun technicien n'a encore été enregistré dans votre club."
-            action={
-              <button className="btn primary" onClick={openCreate}>
-                Ajouter un technicien
-              </button>
-            }
-          />
-        ) : (
-          <div className="table-wrap">
-            <table className="smart-table">
-              <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>Date de naissance</th>
-                  <th>Nationalité</th>
-                  <th>Spécialisation</th>
-                  <th>Statut Licence</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {persons.map((p) => (
-                  <tr key={p._id || p.id}>
-                    <td>
-                      {p.firstName} {p.lastName}
-                    </td>
-                    <td>
-                      {p.dateOfBirth
-                        ? new Date(p.dateOfBirth).toLocaleDateString("fr-FR")
-                        : "—"}
-                    </td>
-                    <td>{p.nationality || "—"}</td>
-                    <td>{(p as any).specialization || "—"}</td>
-                    <td>
-                      <StatusBadge
-                        status={(p as any).licenseStatus || "PENDING"}
-                      />
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className="btn primary"
-                          onClick={() => openEdit(p)}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          className="btn danger"
-                          onClick={() => setDeleteTarget(p)}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
 
       {/* Create / Edit Modal */}
       {modalOpen && (
@@ -447,6 +386,16 @@ export default function ClubTechnicians(): React.ReactElement {
                 />
               </div>
 
+              <div style={{ marginTop: 18 }}>
+                <FileUpload
+                  label="Reçu de paiement"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  maxSizeMB={5}
+                  onUploaded={(url) => setForm({ ...form, paymentReceiptUrl: url })}
+                  currentUrl={form.paymentReceiptUrl || null}
+                />
+              </div>
+
               <div
                 className="modal-actions"
                 style={{
@@ -471,6 +420,93 @@ export default function ClubTechnicians(): React.ReactElement {
           </div>
         </div>
       )}
+
+      <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Rechercher par nom..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{
+            background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: "10px 16px", fontSize: "0.9rem", width: 300,
+          }}
+        />
+        {searchText && (
+          <button className="btn ghost" onClick={() => setSearchText("")}>
+            ✕ Effacer
+          </button>
+        )}
+        <span className="muted" style={{ fontSize: "0.85rem" }}>
+          {persons.length} résultat{persons.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      <div className="table-card">
+        {persons.length === 0 ? (
+          <EmptyState
+            title="Aucun technicien"
+            description="Aucun technicien n'a encore été enregistré dans votre club."
+            action={
+              <button className="btn primary" onClick={openCreate}>
+                Ajouter un technicien
+              </button>
+            }
+          />
+        ) : (
+          <div className="table-wrap">
+            <table className="smart-table">
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Date de naissance</th>
+                  <th>Nationalité</th>
+                  <th>Spécialisation</th>
+                  <th>Statut Licence</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {persons.map((p) => (
+                  <tr key={p._id || p.id}>
+                    <td>
+                      {p.firstName} {p.lastName}
+                    </td>
+                    <td>
+                      {p.dateOfBirth
+                        ? new Date(p.dateOfBirth).toLocaleDateString("fr-FR")
+                        : "—"}
+                    </td>
+                    <td>{p.nationality || "—"}</td>
+                    <td>{(p as any).specialization || "—"}</td>
+                    <td>
+                      <StatusBadge
+                        status={(p as any).licenseStatus || "PENDING"}
+                      />
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button
+                          className="btn primary"
+                          onClick={() => openEdit(p)}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          className="btn danger"
+                          onClick={() => setDeleteTarget(p)}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Delete Confirm */}
       <ConfirmDialog

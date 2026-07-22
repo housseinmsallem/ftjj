@@ -41,6 +41,8 @@ export class ScoringGateway implements OnGatewayConnection, OnGatewayDisconnect 
     bluePenalties?: number;
     redWarnings?: number;
     blueWarnings?: number;
+    stallingTop?: boolean;
+    stallingBottom?: boolean;
   }) {
     this.server.emit('public:scoring:update', data);
   }

@@ -17,7 +17,6 @@ const adminNavItems = [
   { to: "/admin/technicians", label: "Gestion des techniciens", icon: "🔧" },
   { to: "/admin/licenses", label: "Licences", icon: "📜" },
   { to: "/admin/competitions", label: "Compétitions", icon: "🏆" },
-  { to: "/admin/live-scoring", label: "Matchs en direct", icon: "🔴" },
   { to: "/admin/import", label: "Importation CSV", icon: "📥" },
   { to: "/admin/transfers", label: "Transferts", icon: "🔄" },
   { to: "/admin/cms", label: "CMS", icon: "🎨" },
@@ -26,8 +25,8 @@ const adminNavItems = [
 const sidebarStyle: React.CSSProperties = {
   position: "sticky",
   top: 0,
-  width: 250,
-  minWidth: 250,
+  width: 210,
+  minWidth: 210,
   height: "calc(100vh - 64px)",
   overflowY: "auto",
   backgroundColor: "var(--panel)",
@@ -112,7 +111,8 @@ const logoutBtnStyle: React.CSSProperties = {
 
 const mainStyle: React.CSSProperties = {
   flex: 1,
-  padding: 24,
+  padding: "16px 20px",
+  minWidth: 0,
   minHeight: "calc(100vh - 64px)",
   backgroundColor: "var(--bg)",
 };

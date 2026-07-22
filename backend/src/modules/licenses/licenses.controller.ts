@@ -148,4 +148,13 @@ export class LicensesController {
   async deactivate(@Param('id') id: string) {
     return this.licensesService.deactivateLicense(id);
   }
+
+  @Post('deactivate-all')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Désactiver toutes les licences pour la nouvelle saison (admin)' })
+  async deactivateAll() {
+    return this.licensesService.deactivateAllLicenses();
+  }
 }

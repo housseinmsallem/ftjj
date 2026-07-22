@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import logo from "../../assets/images/logo-footer.png";
+import aivoLogo from "../../assets/images/aivoteam.com-favicon.ico";
 import { contactDetails } from "../../data/publicContent";
 
 export default function Footer(): React.ReactElement {
@@ -82,6 +83,26 @@ export default function Footer(): React.ReactElement {
         <span>JJIF</span>
         <span>UNJA</span>
         <span>Tunisie</span>
+        <a
+          href="https://aivoteam.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            color: "rgba(255,255,255,0.5)",
+            textDecoration: "none",
+            fontSize: "0.75rem",
+          }}
+        >
+          Propulsé par{" "}
+          <img
+            src={aivoLogo}
+            alt="AivoTeam"
+            style={{ height: 20, opacity: 0.7 }}
+          />
+        </a>
       </div>
     </footer>
   );

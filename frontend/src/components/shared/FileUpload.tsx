@@ -7,6 +7,7 @@ interface FileUploadProps {
   maxSizeMB?: number;
   onUploaded: (url: string) => void;
   currentUrl?: string | null;
+  light?: boolean;
 }
 
 export default function FileUpload({
@@ -15,6 +16,7 @@ export default function FileUpload({
   maxSizeMB = 10,
   onUploaded,
   currentUrl,
+  light,
 }: FileUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -58,7 +60,7 @@ export default function FileUpload({
 
   return (
     <div className="file-upload-field">
-      <label className="field-label">{label}</label>
+      <label className="field-label" style={light ? { color: "rgba(255,255,255,0.85)" } : undefined}>{label}</label>
       <div className="file-upload-area">
         <input
           ref={fileRef}
@@ -93,6 +95,7 @@ export default function FileUpload({
               target="_blank"
               rel="noopener noreferrer"
               className="file-link"
+              style={light ? { color: "rgba(255,255,255,0.7)" } : undefined}
             >
               Voir le fichier actuel
             </a>

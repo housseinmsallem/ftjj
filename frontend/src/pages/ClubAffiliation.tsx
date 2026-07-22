@@ -24,6 +24,7 @@ interface Docs {
   attestationBlackBelt: string;
   attestationCoaching: string;
   copieJORT: string;
+  assuranceClub: string;
 }
 
 const STEP_LABELS = [
@@ -65,6 +66,7 @@ export default function ClubAffiliation(): React.ReactElement {
     attestationBlackBelt: "",
     attestationCoaching: "",
     copieJORT: "",
+    assuranceClub: "",
   });
 
   const updateField = (field: keyof FormData, value: string) => {
@@ -105,7 +107,8 @@ export default function ClubAffiliation(): React.ReactElement {
         !docs.contratTravail ||
         !docs.attestationBlackBelt ||
         !docs.attestationCoaching ||
-        !docs.copieJORT
+        !docs.copieJORT ||
+        !docs.assuranceClub
       ) {
         return "Veuillez télécharger tous les documents requis.";
       }
@@ -400,6 +403,7 @@ export default function ClubAffiliation(): React.ReactElement {
         return (
           <div style={{ display: "grid", gap: 24 }}>
             <FileUpload
+              light
               label="Demande d'inscription"
               accept=".pdf,.jpg,.jpeg,.png"
               maxSizeMB={10}
@@ -409,6 +413,7 @@ export default function ClubAffiliation(): React.ReactElement {
               }
             />
             <FileUpload
+              light
               label="Contrat du travail signé"
               accept=".pdf,.jpg,.jpeg,.png"
               maxSizeMB={10}
@@ -418,7 +423,8 @@ export default function ClubAffiliation(): React.ReactElement {
               }
             />
             <FileUpload
-              label="Attestation Black belt 1ère degré"
+              light
+              label="Attestation de Grade"
               accept=".pdf,.jpg,.jpeg,.png"
               maxSizeMB={10}
               currentUrl={docs.attestationBlackBelt || null}
@@ -427,7 +433,8 @@ export default function ClubAffiliation(): React.ReactElement {
               }
             />
             <FileUpload
-              label="Attestation fédérale de préparation Coaching"
+              light
+              label="Attestation de Grade d'Entreneur"
               accept=".pdf,.jpg,.jpeg,.png"
               maxSizeMB={10}
               currentUrl={docs.attestationCoaching || null}
@@ -436,12 +443,23 @@ export default function ClubAffiliation(): React.ReactElement {
               }
             />
             <FileUpload
-              label="Copie الرائد الرسمي للجمعية"
+              light
+              label="Registre National pour les Clubs RNE / Copie الرائد الرسمي للجمعية"
               accept=".pdf,.jpg,.jpeg,.png"
               maxSizeMB={10}
               currentUrl={docs.copieJORT || null}
               onUploaded={(url) =>
                 setDocs((prev) => ({ ...prev, copieJORT: url }))
+              }
+            />
+            <FileUpload
+              light
+              label="Assurance Club / Association"
+              accept=".pdf,.jpg,.jpeg,.png"
+              maxSizeMB={10}
+              currentUrl={docs.assuranceClub || null}
+              onUploaded={(url) =>
+                setDocs((prev) => ({ ...prev, assuranceClub: url }))
               }
             />
           </div>

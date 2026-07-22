@@ -29,6 +29,8 @@ interface TechnicianFormData {
   grade: string;
   clubId: string;
   specialization: string;
+  birthCertificateUrl: string;
+  paymentReceiptUrl: string;
 }
 
 const emptyForm: TechnicianFormData = {
@@ -43,6 +45,8 @@ const emptyForm: TechnicianFormData = {
   grade: "",
   clubId: "",
   specialization: "",
+  birthCertificateUrl: "",
+  paymentReceiptUrl: "",
 };
 
 export default function TechniciansManagement(): React.ReactElement {
@@ -52,6 +56,7 @@ export default function TechniciansManagement(): React.ReactElement {
   const [form, setForm] = useState<TechnicianFormData>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const {
     data: personsData,
@@ -60,9 +65,9 @@ export default function TechniciansManagement(): React.ReactElement {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["persons", "TECHNICIAN"],
+    queryKey: ["persons", "TECHNICIAN", searchText],
     queryFn: async () => {
-      const res = await api.get("/persons", { params: { type: "TECHNICIAN" } });
+      const res = await api.get("/persons", { params: { type: "TECHNICIAN", search: searchText || undefined } });
       return (((res.data as any)?.data ?? res.data) as Person[]) || [];
     },
   });
@@ -99,6 +104,8 @@ export default function TechniciansManagement(): React.ReactElement {
       grade: person.grade || "",
       clubId: person.clubId || person.club?._id || person.club?.id || "",
       specialization: ext.specialization || "",
+      birthCertificateUrl: ext.birthCertificateUrl || "",
+      paymentReceiptUrl: ext.paymentReceiptUrl || "",
     });
     setModalOpen(true);
   }
@@ -129,6 +136,8 @@ export default function TechniciansManagement(): React.ReactElement {
       grade: form.grade.trim() || undefined,
       clubId: form.clubId || undefined,
       specialization: form.specialization.trim() || undefined,
+      birthCertificateUrl: form.birthCertificateUrl || undefined,
+      paymentReceiptUrl: form.paymentReceiptUrl || undefined,
     };
 
     Object.keys(payload).forEach((k) => {
@@ -220,6 +229,27 @@ export default function TechniciansManagement(): React.ReactElement {
           </button>
         }
       />
+
+      <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Rechercher par nom..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{
+            background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: "10px 16px", fontSize: "0.9rem", width: 300,
+          }}
+        />
+        {searchText && (
+          <button className="btn ghost" onClick={() => setSearchText("")}>
+            ✕ Effacer
+          </button>
+        )}
+        <span className="muted" style={{ fontSize: "0.85rem" }}>
+          {persons.length} résultat{persons.length !== 1 ? "s" : ""}
+        </span>
+      </div>
 
       <div className="table-card">
         {persons.length === 0 ? (
@@ -487,9 +517,9 @@ export default function TechniciansManagement(): React.ReactElement {
                     accept=".pdf,.jpg,.jpeg,.png"
                     maxSizeMB={5}
                     onUploaded={(url) =>
-                      setForm({ ...form, identityDocumentUrl: url })
+                      setForm({ ...form, birthCertificateUrl: url })
                     }
-                    currentUrl={form.identityDocumentUrl || null}
+                    currentUrl={form.birthCertificateUrl || null}
                   />
                 </div>
               )}
@@ -501,6 +531,16 @@ export default function TechniciansManagement(): React.ReactElement {
                   maxSizeMB={5}
                   onUploaded={(url) => setForm({ ...form, photoUrl: url })}
                   currentUrl={form.photoUrl || null}
+                />
+              </div>
+
+              <div style={{ marginTop: 18 }}>
+                <FileUpload
+                  label="Reçu de paiement"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  maxSizeMB={5}
+                  onUploaded={(url) => setForm({ ...form, paymentReceiptUrl: url })}
+                  currentUrl={form.paymentReceiptUrl || null}
                 />
               </div>
 

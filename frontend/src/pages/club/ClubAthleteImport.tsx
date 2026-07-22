@@ -19,6 +19,7 @@ interface CsvRow {
   identityDocumentType: string;
   grade: string;
   club: string;
+  achievements: string;
 }
 
 interface CsvError {
@@ -37,6 +38,8 @@ interface BatchPerson {
   weight: string;
   identityDocumentUrl: string;
   birthCertificateUrl: string;
+  photoUrl: string;
+  achievements: string;
 }
 
 const emptyBatch: BatchPerson = {
@@ -50,6 +53,8 @@ const emptyBatch: BatchPerson = {
   weight: "",
   identityDocumentUrl: "",
   birthCertificateUrl: "",
+  photoUrl: "",
+  achievements: "",
 };
 
 const inputStyle: React.CSSProperties = {
@@ -84,7 +89,7 @@ export default function ClubAthleteImport(): React.ReactElement {
   const [batchRows, setBatchRows] = useState<BatchPerson[]>([
     { ...emptyBatch },
   ]);
-  const [commonPaymentUrl, setCommonPaymentUrl] = useState<string>("");
+  const [commonPaymentUrls, setCommonPaymentUrls] = useState<string[]>([]);
   const [commonPricingId, setCommonPricingId] = useState<string>("");
   const [batchResult, setBatchResult] = useState<{
     success: number;
@@ -121,7 +126,7 @@ export default function ClubAthleteImport(): React.ReactElement {
   // Inline upload for batch rows
   async function uploadBatchDoc(
     idx: number,
-    field: "identityDocumentUrl" | "birthCertificateUrl",
+    field: "identityDocumentUrl" | "birthCertificateUrl" | "photoUrl",
     file: File,
   ) {
     const formData = new FormData();
@@ -152,6 +157,8 @@ export default function ClubAthleteImport(): React.ReactElement {
       weight: "",
       identityDocumentUrl: "",
       birthCertificateUrl: "",
+      photoUrl: "",
+      achievements: "",
     }));
     setBatchRows(mapped);
     setTab("batch");
@@ -219,6 +226,7 @@ export default function ClubAthleteImport(): React.ReactElement {
               r.identityDocumentType || r["type document"] || "CIN",
             grade: r.grade || r["ceinture"] || "",
             club: r.club || r["club"] || "",
+            achievements: (r["Palmarès"] || r["palmares"] || r["achievements"] || "").trim(),
           });
         });
         setCsvRows(rows);
@@ -259,7 +267,7 @@ export default function ClubAthleteImport(): React.ReactElement {
         errors.push(`Ligne ${i + 1} : Date de naissance requise`);
       if (!row.gender) errors.push(`Ligne ${i + 1} : Genre requis`);
     });
-    if (!commonPaymentUrl) errors.push("Le reçu de paiement commun est requis");
+    if (commonPaymentUrls.length === 0) errors.push("Au moins un reçu de paiement est requis");
     if (!commonPricingId) errors.push("Le type de licence est requis");
     return errors;
   }
@@ -287,11 +295,13 @@ export default function ClubAthleteImport(): React.ReactElement {
         weight: row.weight ? Number(row.weight) : undefined,
         identityDocumentUrl: row.identityDocumentUrl || undefined,
         birthCertificateUrl: row.birthCertificateUrl || undefined,
+        photoUrl: row.photoUrl || undefined,
+        achievements: row.achievements ? row.achievements.split("|").map(s => s.trim()).filter(Boolean) : undefined,
       };
     });
     batchMutation.mutate({
       persons: persons as any,
-      commonPaymentReceiptUrl: commonPaymentUrl,
+      commonPaymentReceiptUrl: commonPaymentUrls.join("|"),
       commonPricingId:
         commonPricingId === "__athlete_license__" ? "" : commonPricingId,
     });
@@ -477,7 +487,9 @@ export default function ClubAthleteImport(): React.ReactElement {
                   <th>Poids (kg)</th>
                   <th>Type doc.</th>
                   <th>Fichier ID</th>
+                  <th>Photo</th>
                   <th>Grade</th>
+                  <th>Palmarès</th>
                   <th style={{ width: 60 }}></th>
                 </tr>
               </thead>
@@ -648,6 +660,20 @@ export default function ClubAthleteImport(): React.ReactElement {
                       </div>
                     </td>
                     <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <label style={{ ...inputStyle, width: "auto", padding: "6px 10px", cursor: "pointer", fontSize: "0.75rem", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          📷 Upload
+                          <input type="file" accept=".jpg,.jpeg,.png,.webp" style={{ display: "none" }}
+                            onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadBatchDoc(idx, "photoUrl", file); }} />
+                        </label>
+                        {row.photoUrl ? (
+                          <a href={row.photoUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--green)", fontSize: "0.75rem" }}>✓</a>
+                        ) : (
+                          <span style={{ color: "var(--muted)", fontSize: "0.75rem" }}>—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
                       <select
                         value={row.grade || ""}
                         onChange={(e) =>
@@ -662,6 +688,11 @@ export default function ClubAthleteImport(): React.ReactElement {
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td>
+                      <input type="text" value={row.achievements}
+                        onChange={(e) => updateBatchRow(idx, "achievements", e.target.value)}
+                        placeholder="Champ. 2025 | Open Tunis" style={inputStyle} />
                     </td>
                     <td>
                       <button
@@ -804,14 +835,31 @@ export default function ClubAthleteImport(): React.ReactElement {
                   </div>
                 )}
               </div>
-              <div>
-                <FileUpload
-                  label="Reçu de paiement commun"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  maxSizeMB={10}
-                  onUploaded={(url) => setCommonPaymentUrl(url)}
-                  currentUrl={commonPaymentUrl || null}
-                />
+              <div style={{ marginBottom: 16 }}>
+                <label className="field-label" style={{ marginBottom: 8 }}>Reçus de paiement</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {commonPaymentUrls.map((url, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "var(--bg)", borderRadius: 8, border: "1px solid var(--border)" }}>
+                      <span style={{ flex: 1, fontSize: "0.85rem", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        📎 Reçu {i + 1}
+                      </span>
+                      <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--green)", fontSize: "0.8rem" }}>Voir</a>
+                      <button className="btn danger" style={{ padding: "2px 8px", fontSize: "0.7rem" }}
+                        onClick={() => setCommonPaymentUrls(commonPaymentUrls.filter((_, j) => j !== i))}>
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <FileUpload
+                    label="Ajouter un reçu de paiement"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    maxSizeMB={10}
+                    currentUrl={null}
+                    onUploaded={(url) => setCommonPaymentUrls([...commonPaymentUrls, url])}
+                  />
+                </div>
               </div>
             </div>
           </div>

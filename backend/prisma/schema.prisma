@@ -113,7 +113,7 @@ model ClubDocument {
   club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
   fileName  String
   fileUrl   String
-  fileType  String   @default("document") // inscription_form, work_contract, black_belt_attestation, coaching_attestation
+  fileType  String   @default("document") // inscription_form, work_contract, black_belt_attestation, coaching_attestation, jort_copy, assurance
   createdAt DateTime @default(now())
 
   @@map("club_documents")
@@ -128,9 +128,11 @@ model Person {
   nationality          String               @default("Tunisienne")
   gender               Gender
   photoUrl             String?
+  achievements         String[]
   identityDocumentType IdentityDocumentType
   identityDocumentUrl  String?
   birthCertificateUrl  String?
+  paymentReceiptUrl   String?
   type                 PersonType
   clubId               String?
   club                 Club?                @relation(fields: [clubId], references: [id])
@@ -247,16 +249,19 @@ model Competition {
   type         String       @default("Open")
   splitByBelt  Boolean      @default(false)
   isPublic     Boolean      @default(true)
-  ageDivision  AgeDivision  @default(ADULTS)
+  ageDivisions String[]     @default(["ADULTS"])
   seasonYear   Int          @default(2026)
   posterUrl    String?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+  moderationToken String?   @unique
+  isClosed     Boolean  @default(false)
 
   documents   CompetitionDocument[]
   featuredMedia FeaturedMedia[]
   signups     CompetitionSignup[]
   matches   Match[]
+  mats         Mat[]
 
   @@map("competitions")
 }
@@ -272,6 +277,18 @@ model CompetitionDocument {
   @@map("competition_documents")
 }
 
+model Mat {
+  id            String      @id @default(uuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  name          String
+  number        Int
+  matches       Match[]
+  createdAt     DateTime    @default(now())
+
+  @@map("mats")
+}
+
 model CompetitionSignup {
   id                String             @id @default(uuid())
   competitionId     String
@@ -279,6 +296,7 @@ model CompetitionSignup {
   personId          String
   person            Person             @relation(fields: [personId], references: [id])
   type              PersonType
+  weight            Float?
   paymentReceiptUrl String?
   status            RegistrationStatus @default(PENDING)
   createdAt         DateTime           @default(now())
@@ -291,10 +309,10 @@ model Match {
   id            String      @id @default(uuid())
   competitionId String
   competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
-  redCornerId   String
-  redCorner     Person      @relation("RedCorner", fields: [redCornerId], references: [id])
-  blueCornerId  String
-  blueCorner    Person      @relation("BlueCorner", fields: [blueCornerId], references: [id])
+  redCornerId   String?
+  redCorner     Person?     @relation("RedCorner", fields: [redCornerId], references: [id])
+  blueCornerId  String?
+  blueCorner    Person?     @relation("BlueCorner", fields: [blueCornerId], references: [id])
   redScore      Int         @default(0)
   blueScore     Int         @default(0)
   warningsRed   Int         @default(0)
@@ -302,8 +320,12 @@ model Match {
   warningsBlue  Int         @default(0)
   penaltiesBlue Int         @default(0)
   status        MatchStatus @default(UPCOMING)
-  matNumber     Int         @default(1)
   winMethod     String? // points, submission, decision, forfeit, disqualification, draw
+  matId         String?
+  round            Int         @default(1)
+  bracketPosition  Int?       // position in the bracket tree (1-based)
+  nextMatchId      String?    // which match the winner advances to
+  mat           Mat?        @relation(fields: [matId], references: [id], onDelete: SetNull)
   winnerSide    String? // red, blue, draw
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt

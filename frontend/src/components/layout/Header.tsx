@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import type { User } from "../../types";
 import logo from "../../assets/images/logo.png";
+import aivoLogo from "../../assets/images/aivoteam.com-favicon.ico";
 
 interface NavLinkItem {
   to: string;
@@ -133,6 +134,9 @@ export default function Header(): React.ReactElement {
             <Link className="public-utility-cta desktop-only" to="/affiliation">
               Affiliation
             </Link>
+            {/*<a href="https://aivoteam.com/" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", marginRight: 8 }}>
+              <img src={aivoLogo} alt="AivoTeam" style={{ height: 18, opacity: 0.6 }} />
+            </a>*/}
             <span className="public-locale-pill">TN</span>
           </div>
         </div>

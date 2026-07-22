@@ -18,7 +18,7 @@ export class MatchesService {
         redCorner: { select: { id: true, firstName: true, lastName: true, type: true } },
         blueCorner: { select: { id: true, firstName: true, lastName: true, type: true } },
       },
-      orderBy: [{ matNumber: 'asc' }, { createdAt: 'asc' }],
+      orderBy: { createdAt: 'asc' }
     });
 
     return { data: matches };
@@ -67,7 +67,6 @@ export class MatchesService {
     competitionId: string;
     redCornerId: string;
     blueCornerId: string;
-    matNumber?: number;
   }) {
     if (data.redCornerId === data.blueCornerId) {
       throw new NotFoundException('Les deux combattants ne peuvent pas être la même personne');
@@ -78,7 +77,6 @@ export class MatchesService {
         competitionId: data.competitionId,
         redCornerId: data.redCornerId,
         blueCornerId: data.blueCornerId,
-        matNumber: data.matNumber || 1,
         status: MatchStatus.UPCOMING,
       },
       include: {
@@ -173,7 +171,38 @@ export class MatchesService {
       },
     });
 
+    // Auto-advance winner to next bracket round
+    await this.advanceWinner(id);
+
     return { message: 'Match terminé', data: updated };
+  }
+
+  private async advanceWinner(matchId: string) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: { redCornerId: true, blueCornerId: true, winnerSide: true, round: true, bracketPosition: true, competitionId: true },
+    });
+    if (!match || !match.winnerSide) return;
+
+    const winnerId = match.winnerSide === 'red' ? match.redCornerId : match.blueCornerId;
+    if (!winnerId) return;
+
+    const nextPos = Math.ceil((match.bracketPosition || 1) / 2);
+    const nextMatch = await this.prisma.match.findFirst({
+      where: {
+        competitionId: match.competitionId,
+        round: match.round + 1,
+        bracketPosition: nextPos,
+      },
+    });
+
+    if (!nextMatch) return;
+
+    const isRed = (match.bracketPosition || 1) % 2 === 1;
+    await this.prisma.match.update({
+      where: { id: nextMatch.id },
+      data: isRed ? { redCornerId: winnerId } : { blueCornerId: winnerId },
+    });
   }
 
   async delete(id: string) {

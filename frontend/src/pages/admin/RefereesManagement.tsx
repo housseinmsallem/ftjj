@@ -29,6 +29,7 @@ interface RefereeFormData {
   grade: string;
   clubId: string;
   refereeDegreeAttestationUrl: string;
+  paymentReceiptUrl: string;
 }
 
 const emptyForm: RefereeFormData = {
@@ -43,6 +44,7 @@ const emptyForm: RefereeFormData = {
   grade: "",
   clubId: "",
   refereeDegreeAttestationUrl: "",
+  paymentReceiptUrl: "",
 };
 
 export default function RefereesManagement(): React.ReactElement {
@@ -52,6 +54,7 @@ export default function RefereesManagement(): React.ReactElement {
   const [form, setForm] = useState<RefereeFormData>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const {
     data: personsData,
@@ -60,9 +63,9 @@ export default function RefereesManagement(): React.ReactElement {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["persons", "REFEREE"],
+    queryKey: ["persons", "REFEREE", searchText],
     queryFn: async () => {
-      const res = await api.get("/persons", { params: { type: "REFEREE" } });
+      const res = await api.get("/persons", { params: { type: "REFEREE", search: searchText || undefined } });
       return (((res.data as any)?.data ?? res.data) as Person[]) || [];
     },
   });
@@ -99,6 +102,7 @@ export default function RefereesManagement(): React.ReactElement {
       grade: person.grade || "",
       clubId: person.clubId || person.club?._id || person.club?.id || "",
       refereeDegreeAttestationUrl: ext.refereeDegreeAttestationUrl || "",
+      paymentReceiptUrl: ext.paymentReceiptUrl || "",
     });
     setModalOpen(true);
   }
@@ -130,6 +134,7 @@ export default function RefereesManagement(): React.ReactElement {
       clubId: form.clubId || undefined,
       refereeDegreeAttestationUrl:
         form.refereeDegreeAttestationUrl || undefined,
+      paymentReceiptUrl: form.paymentReceiptUrl || undefined,
     };
 
     Object.keys(payload).forEach((k) => {
@@ -228,6 +233,27 @@ export default function RefereesManagement(): React.ReactElement {
           </button>
         }
       />
+
+      <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Rechercher par nom..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{
+            background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: "10px 16px", fontSize: "0.9rem", width: 300,
+          }}
+        />
+        {searchText && (
+          <button className="btn ghost" onClick={() => setSearchText("")}>
+            ✕ Effacer
+          </button>
+        )}
+        <span className="muted" style={{ fontSize: "0.85rem" }}>
+          {persons.length} résultat{persons.length !== 1 ? "s" : ""}
+        </span>
+      </div>
 
       <div className="table-card">
         {persons.length === 0 ? (
@@ -525,6 +551,15 @@ export default function RefereesManagement(): React.ReactElement {
                     setForm({ ...form, refereeDegreeAttestationUrl: url })
                   }
                   currentUrl={form.refereeDegreeAttestationUrl || null}
+                />
+              </div>
+              <div style={{ marginTop: 18 }}>
+                <FileUpload
+                  label="Reçu de paiement"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  maxSizeMB={5}
+                  onUploaded={(url) => setForm({ ...form, paymentReceiptUrl: url })}
+                  currentUrl={form.paymentReceiptUrl || null}
                 />
               </div>
 

@@ -124,6 +124,7 @@ export default function ClubCompetitions(): React.ReactElement {
                   <th>Ruleset</th>
                   <th>Date</th>
                   <th>Lieu</th>
+                  <th>Statut</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -169,24 +170,65 @@ export default function ClubCompetitions(): React.ReactElement {
                       </td>
                       <td>{comp.location || "—"}</td>
                       <td>
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <button
-                            className="btn primary"
-                            onClick={() =>
-                              navigate(
-                                `/club/competitions/${comp._id || comp.id}/register`,
-                              )
-                            }
+                        {(comp as any).isRegistrationOpen ? (
+                          <span
+                            style={{
+                              padding: "2px 10px",
+                              borderRadius: 12,
+                              fontSize: "0.8rem",
+                              fontWeight: 600,
+                              background: "#22c55e20",
+                              color: "#22c55e",
+                            }}
                           >
-                            S'inscrire
-                          </button>
+                            Ouvert
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              padding: "2px 10px",
+                              borderRadius: 12,
+                              fontSize: "0.8rem",
+                              fontWeight: 600,
+                              background: "rgba(100,116,139,0.15)",
+                              color: "#94a3b8",
+                            }}
+                          >
+                            Fermé
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          {(comp as any).isRegistrationOpen ? (
+                            <button
+                              className="btn primary"
+                              onClick={() =>
+                                navigate(
+                                  `/club/competitions/${comp._id || comp.id}/register`,
+                                )
+                              }
+                            >
+                              S'inscrire
+                            </button>
+                          ) : (
+                            <span
+                              style={{
+                                color: "var(--muted)",
+                                fontSize: "0.85rem",
+                                fontStyle: "italic",
+                              }}
+                            >
+                              Inscriptions fermées
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>
                     {/* Expandable details */}
                     {expandedId === (comp._id || comp.id) && (
                       <tr key={`${comp._id || comp.id}-details`}>
-                        <td colSpan={6} style={{ padding: "16px 20px" }}>
+                        <td colSpan={7} style={{ padding: "16px 20px" }}>
                           {/* Description */}
                           {(comp as any).description && (
                             <div style={{ marginBottom: 16 }}>

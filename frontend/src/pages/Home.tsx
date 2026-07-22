@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Swords, Building2, Trophy, Scale, Globe2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import HomeContentSlider from "../components/content/HomeContentSlider";
 import { portalCards } from "../data/publicContent";
 import { publicApi } from "../services/api";
 import api from "../services/api";
+import ftjjLogo from "../assets/images/logo.png";
 
 interface RankingAthlete {
   name: string;
@@ -197,20 +197,20 @@ export default function Home(): React.ReactElement {
       {
         value: s?.athletes ? formatNumber(s.athletes) : "--",
         label: "Athlètes licenciés",
-        icon: <Swords size={32} strokeWidth={1.5} color="#d51332" />,
+        icon: <img src={ftjjLogo} alt="FTJJ" style={{ width: 32, height: 32, objectFit: "contain", opacity: 0.9 }} />,
       },
       {
         value: s?.clubs ? formatNumber(s.clubs) : "--",
         label: "Clubs affiliés",
-        icon: <Building2 size={32} strokeWidth={1.5} color="#d51332" />,
+        icon: <img src={ftjjLogo} alt="FTJJ" style={{ width: 32, height: 32, objectFit: "contain", opacity: 0.9 }} />,
       },
       {
         value: s?.competitions ? formatNumber(s.competitions) : "--",
         label: "Compétitions / an",
-        icon: <Trophy size={32} strokeWidth={1.5} color="#d51332" />,
+        icon: <img src={ftjjLogo} alt="FTJJ" style={{ width: 32, height: 32, objectFit: "contain", opacity: 0.9 }} />,
       },
-      { value: "320", label: "Arbitres & coachs", icon: <Scale size={32} strokeWidth={1.5} color="#d51332" /> },
-      { value: "Tunisie", label: "Membre de la JJIF", icon: <Globe2 size={32} strokeWidth={1.5} color="#d51332" /> },
+      { value: "320", label: "Arbitres & coachs", icon: <img src={ftjjLogo} alt="FTJJ" style={{ width: 32, height: 32, objectFit: "contain", opacity: 0.9 }} /> },
+      { value: "Tunisie", label: "Membre de la JJIF", icon: <img src={ftjjLogo} alt="FTJJ" style={{ width: 32, height: 32, objectFit: "contain", opacity: 0.9 }} /> },
     ];
   }, [homeData]);
 

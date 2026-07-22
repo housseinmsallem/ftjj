@@ -71,16 +71,25 @@ export class AuthService {
       include: { club: true },
     });
 
-    // Save uploaded documents
+    // Save uploaded documents with proper file type mapping
     if (dto.documents && user.club) {
-      const urls = Object.values(dto.documents).filter(Boolean) as string[];
-      for (const url of urls) {
-        if (url) {
+      const documentTypeMap: Record<string, string> = {
+        demandeInscription: "inscription_form",
+        contratTravail: "work_contract",
+        attestationBlackBelt: "black_belt_attestation",
+        attestationCoaching: "coaching_attestation",
+        copieJORT: "jort_copy",
+        assuranceClub: "assurance",
+      };
+
+      for (const [key, url] of Object.entries(dto.documents)) {
+        if (url && typeof url === "string") {
           await this.prisma.clubDocument.create({
             data: {
               clubId: user.club.id,
               fileName: url.split("/").pop() || "document",
               fileUrl: url,
+              fileType: documentTypeMap[key] || "document",
             },
           });
         }

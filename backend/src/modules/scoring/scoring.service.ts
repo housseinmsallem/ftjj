@@ -59,6 +59,7 @@ export class ScoringService {
           select: { id: true, firstName: true, lastName: true, photoUrl: true },
         },
         competition: { select: { id: true, name: true } },
+        mat: { select: { number: true } },
       },
     });
 
@@ -67,6 +68,22 @@ export class ScoringService {
     }
 
     const sessionId = data.matchId; // Use match ID as session ID
+
+    // Don't overwrite an existing session (e.g. one created by the referee)
+    const existing = this.sessions.get(sessionId);
+    if (existing) {
+      return {
+        data: {
+          _id: sessionId,
+          ...existing,
+          fight: {
+            redAthlete: match.redCorner,
+            blueAthlete: match.blueCorner,
+          },
+          competition: match.competition,
+        },
+      };
+    }
 
     this.sessions.set(sessionId, {
       matchId: data.matchId,
@@ -79,7 +96,7 @@ export class ScoringService {
       blue: { score: 0, advantages: 0, penalties: 0, warnings: 0 },
       discipline: data.discipline || "NEWAZA",
       category: data.category || "",
-      mat: data.mat || `Tatami ${match.matNumber}`,
+      mat: data.mat || `Tatami ${match.mat?.number ?? 1}`,
       round: data.round || "Tableau principal",
       winnerSide: null,
       winMethod: null,
@@ -289,6 +306,16 @@ export class ScoringService {
     return this.getSession(sessionId);
   }
 
+  async syncTimer(sessionId: string, data: { remainingSeconds: number; running: boolean; stallingTop?: boolean; stallingBottom?: boolean }) {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new NotFoundException('Session non trouvée');
+
+    session.timer.remainingSeconds = Math.max(0, data.remainingSeconds);
+    session.timer.status = data.running ? 'running' : 'paused';
+
+    return this.getSession(sessionId);
+  }
+
   async sendAction(
     sessionId: string,
     action: { side: string; type: string; value?: number },
@@ -301,16 +328,16 @@ export class ScoringService {
 
     switch (action.type) {
       case "point":
-        target.score += action.value || 2;
+        target.score = Math.max(0, target.score + (action.value || 2));
         break;
       case "advantage":
         target.advantages += action.value || 1;
         break;
       case "penalty":
-        target.penalties += action.value || 1;
+        target.penalties = Math.max(0, target.penalties + (action.value || 1));
         break;
       case "warning":
-        target.warnings += action.value || 1;
+        target.warnings = Math.max(0, target.warnings + (action.value || 1));
         break;
       case "subtract_point":
         target.score = Math.max(0, target.score - (action.value || 1));
@@ -441,6 +468,35 @@ export class ScoringService {
     return {
       data: rulesets[discipline?.toUpperCase()] || rulesets.NEWAZA,
     };
+  }
+
+  async resetSession(sessionId: string) {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new NotFoundException('Session non trouvée');
+
+    session.timer = { status: 'idle', remainingSeconds: 300, totalSeconds: 300 };
+    session.red = { score: 0, advantages: 0, penalties: 0, warnings: 0 };
+    session.blue = { score: 0, advantages: 0, penalties: 0, warnings: 0 };
+    session.winnerSide = null;
+    session.winMethod = null;
+    session.actions = [];
+
+    await this.prisma.match.update({
+      where: { id: session.matchId },
+      data: {
+        status: 'UPCOMING',
+        redScore: 0,
+        blueScore: 0,
+        warningsRed: 0,
+        penaltiesRed: 0,
+        warningsBlue: 0,
+        penaltiesBlue: 0,
+        winnerSide: null,
+        winMethod: null,
+      },
+    });
+
+    return { message: 'Session réinitialisée' };
   }
 
   getSessionState(sessionId: string) {

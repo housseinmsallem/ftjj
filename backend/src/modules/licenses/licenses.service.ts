@@ -21,6 +21,25 @@ export class LicensesService {
     isActive?: boolean;
     validatedByAdmin?: boolean;
   }) {
+    // Auto-deactivate licenses on September 1st each year
+    const now = new Date();
+    if (now.getMonth() >= 8 && now.getDate() >= 1) {
+      // Check if deactivation was already done this season
+      const anyActive = await this.prisma.license.count({ where: { isActive: true } });
+      if (anyActive > 0) {
+        // Only deactivate if licenses were issued before September 1st
+        const oldLicenses = await this.prisma.license.count({
+          where: { isActive: true, issuedAt: { lt: new Date(now.getFullYear(), 8, 1) } },
+        });
+        if (oldLicenses > 0) {
+          await this.prisma.license.updateMany({
+            where: { isActive: true, issuedAt: { lt: new Date(now.getFullYear(), 8, 1) } },
+            data: { isActive: false },
+          });
+        }
+      }
+    }
+
     const where: any = {};
 
     if (filters.personId) where.personId = filters.personId;
@@ -360,6 +379,24 @@ export class LicensesService {
     });
 
     return { message: "Licence désactivée avec succès" };
+  }
+
+  // Deactivate all licenses for the new season (called on/after September 1st)
+  async deactivateAllLicenses() {
+    const now = new Date();
+    const seasonCutoff = new Date(now.getFullYear(), 8, 1); // September 1st
+    
+    // Only deactivate if we're past September 1st
+    if (now < seasonCutoff) {
+      return { message: "La nouvelle saison n'a pas encore commencé. Aucune licence désactivée.", data: { count: 0 } };
+    }
+
+    const result = await this.prisma.license.updateMany({
+      where: { isActive: true },
+      data: { isActive: false },
+    });
+
+    return { message: `${result.count} licence(s) désactivée(s) pour la nouvelle saison.`, data: { count: result.count } };
   }
 
   async getClubLicenses(clubId: string, user?: { id: string; role: Role }) {

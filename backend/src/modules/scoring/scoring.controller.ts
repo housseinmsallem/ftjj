@@ -7,6 +7,7 @@ import {
   Body,
   Query,
   UseGuards,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ScoringService } from './scoring.service';
@@ -237,13 +238,14 @@ export class ScoringController {
         bluePenalties: session.blue.penalties,
         redWarnings: session.red.warnings,
         blueWarnings: session.blue.warnings,
+        stallingTop: false,
+        stallingBottom: false,
       });
-      this.scoringGateway.broadcastDashboardUpdate({ sessionId: id });
     }
     return result;
   }
 
-  @Patch('sessions/:id/finish')
+  @Patch('public/sessions/:id/finish')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
@@ -299,5 +301,166 @@ export class ScoringController {
       });
     }
     return result;
+  }
+
+  // ── Public / Moderation scoring endpoints (token-based, no JWT) ──
+
+  @Post('public/sessions')
+  @ApiOperation({ summary: 'Créer une session de scoring (publique/modération)' })
+  async publicCreateSession(@Body() dto: CreateSessionDto) {
+    const result = await this.scoringService.createSession(dto);
+    this.scoringGateway.broadcastSessionCreated();
+    return result;
+  }
+
+  @Patch('public/sessions/:id/start')
+  @ApiOperation({ summary: 'Démarrer une session (publique)' })
+  async publicStartSession(@Param('id') id: string) {
+    const result = await this.scoringService.startSession(id);
+    const session = this.scoringService.getSessionState(id);
+    if (session) {
+      this.scoringGateway.broadcastScoringUpdate({
+        sessionId: id,
+        status: 'live',
+        timerState: session.timer.status,
+        remainingSeconds: session.timer.remainingSeconds,
+        redScore: session.red.score,
+        blueScore: session.blue.score,
+      });
+    }
+    return result;
+  }
+
+  @Patch('public/sessions/:id/pause')
+  @ApiOperation({ summary: 'Pause session (publique)' })
+  async publicPauseSession(@Param('id') id: string) {
+    const result = await this.scoringService.pauseSession(id);
+    const session = this.scoringService.getSessionState(id);
+    if (session) {
+      this.scoringGateway.broadcastScoringUpdate({
+        sessionId: id,
+        status: 'paused',
+        timerState: session.timer.status,
+        remainingSeconds: session.timer.remainingSeconds,
+      });
+    }
+    return result;
+  }
+
+  @Patch('public/sessions/:id/action')
+  @ApiOperation({ summary: 'Action de score (publique)' })
+  async publicSendAction(@Param('id') id: string, @Body() dto: ScoreActionDto) {
+    const result = await this.scoringService.sendAction(id, dto);
+    const session = this.scoringService.getSessionState(id);
+    if (session) {
+      this.scoringGateway.broadcastScoringUpdate({
+        sessionId: id,
+        status: session.timer.status === 'running' ? 'live' : 'paused',
+        timerState: session.timer.status,
+        remainingSeconds: session.timer.remainingSeconds,
+        redScore: session.red.score,
+        blueScore: session.blue.score,
+        redAdvantages: session.red.advantages,
+        blueAdvantages: session.blue.advantages,
+        redPenalties: session.red.penalties,
+        bluePenalties: session.blue.penalties,
+        redWarnings: session.red.warnings,
+        blueWarnings: session.blue.warnings,
+        stallingTop: false,
+        stallingBottom: false,
+      });
+    }
+    return result;
+  }
+
+  @Patch('public/sessions/:id/sync-timer')
+  @ApiOperation({ summary: 'Terminer session (publique)' })
+  async publicFinishSession(@Param('id') id: string, @Body() dto: FinishSessionDto) {
+    const result = await this.scoringService.finishSession(id, dto);
+    const session = this.scoringService.getSessionState(id);
+    if (session) {
+      this.scoringGateway.broadcastScoringUpdate({
+        sessionId: id,
+        status: 'finished',
+        timerState: session.timer.status,
+        winnerSide: session.winnerSide,
+        winMethod: session.winMethod,
+        redScore: session.red.score,
+        blueScore: session.blue.score,
+      });
+    }
+    return result;
+  }
+
+  @Patch('public/sessions/:id/sync-timer')
+  @ApiOperation({ summary: 'Sync timer state (publique)' })
+  async publicSyncTimer(
+    @Param('id') id: string,
+    @Body() body: { remainingSeconds: number; running: boolean; stallingTop?: boolean; stallingBottom?: boolean },
+  ) {
+    await this.scoringService.syncTimer(id, body);
+    const session = this.scoringService.getSessionState(id);
+    if (session) {
+      this.scoringGateway.broadcastScoringUpdate({
+        sessionId: id,
+        status: body.running ? 'live' : 'paused',
+        timerState: session.timer.status,
+        remainingSeconds: session.timer.remainingSeconds,
+        redScore: session.red.score,
+        blueScore: session.blue.score,
+        redAdvantages: session.red.advantages,
+        blueAdvantages: session.blue.advantages,
+        redPenalties: session.red.penalties,
+        bluePenalties: session.blue.penalties,
+        redWarnings: session.red.warnings,
+        blueWarnings: session.blue.warnings,
+        stallingTop: body.stallingTop || false,
+        stallingBottom: body.stallingBottom || false,
+      });
+    }
+    return { message: 'Timer sync OK' };
+  }
+
+  @Patch('public/sessions/:id/undo')
+  @ApiOperation({ summary: 'Annuler la dernière action (publique)' })
+  async publicUndoAction(@Param('id') id: string) {
+    const result = await this.scoringService.undoAction(id);
+    const session = this.scoringService.getSessionState(id);
+    if (session) {
+      this.scoringGateway.broadcastScoringUpdate({
+        sessionId: id,
+        status: session.timer.status === 'running' ? 'live' : 'paused',
+        timerState: session.timer.status,
+        remainingSeconds: session.timer.remainingSeconds,
+        redScore: session.red.score,
+        blueScore: session.blue.score,
+        redAdvantages: session.red.advantages,
+        blueAdvantages: session.blue.advantages,
+        redPenalties: session.red.penalties,
+        bluePenalties: session.blue.penalties,
+        redWarnings: session.red.warnings,
+        blueWarnings: session.blue.warnings,
+      });
+    }
+    return result;
+  }
+
+  @Patch('public/sessions/:id/reset')
+  @ApiOperation({ summary: 'Réinitialiser une session (remet à zéro, arrête le live)' })
+  async publicResetSession(@Param('id') id: string) {
+    await this.scoringService.resetSession(id);
+    const session = this.scoringService.getSessionState(id);
+    if (!session) throw new NotFoundException('Session non trouvée');
+
+    this.scoringGateway.broadcastScoringUpdate({
+      sessionId: id,
+      status: 'idle',
+      timerState: 'idle',
+      remainingSeconds: 300,
+      redScore: 0,
+      blueScore: 0,
+    });
+
+    return { message: 'Session réinitialisée', data: session };
   }
 }

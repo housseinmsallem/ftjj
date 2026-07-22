@@ -133,8 +133,10 @@ nav a.active {
 }
 
 .page {
-  width: min(1180px, 92vw);
-  margin: 36px auto;
+  width: 100%;
+  max-width: 1400px;
+  margin: 20px auto;
+  padding: 0 8px;
 }
 
 .page-head {

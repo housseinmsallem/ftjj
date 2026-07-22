@@ -23,7 +23,8 @@ interface AthleteFormData {
   birthCertificateUrl: string;
   photoUrl: string;
   grade: string;
-  weight: string;
+  achievements: string[];
+  paymentReceiptUrl: string;
 }
 
 const emptyForm: AthleteFormData = {
@@ -37,7 +38,8 @@ const emptyForm: AthleteFormData = {
   birthCertificateUrl: "",
   photoUrl: "",
   grade: "",
-  weight: "",
+  achievements: [],
+  paymentReceiptUrl: "",
 };
 
 export default function ClubAthletes(): React.ReactElement {
@@ -50,6 +52,7 @@ export default function ClubAthletes(): React.ReactElement {
   const [form, setForm] = useState<AthleteFormData>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const {
     data: personsData,
@@ -58,10 +61,10 @@ export default function ClubAthletes(): React.ReactElement {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["persons", "ATHLETE", clubId],
+    queryKey: ["persons", "ATHLETE", clubId, searchText],
     queryFn: async () => {
       const res = await api.get("/persons", {
-        params: { type: "ATHLETE", clubId },
+        params: { type: "ATHLETE", clubId, search: searchText || undefined },
       });
       return (((res.data as any)?.data ?? res.data) as Person[]) || [];
     },
@@ -99,8 +102,8 @@ export default function ClubAthletes(): React.ReactElement {
       birthCertificateUrl: (person as any).birthCertificateUrl || "",
       photoUrl: person.photoUrl || "",
       grade: person.grade || "",
-      weight:
-        (person as any).weight != null ? String((person as any).weight) : "",
+      achievements: Array.isArray((person as any).achievements) ? (person as any).achievements : [],
+      paymentReceiptUrl: (person as any).paymentReceiptUrl || "",
     });
     setModalOpen(true);
   }
@@ -140,7 +143,8 @@ export default function ClubAthletes(): React.ReactElement {
       birthCertificateUrl: form.birthCertificateUrl || undefined,
       photoUrl: form.photoUrl || undefined,
       grade: form.grade.trim() || undefined,
-      weight: form.weight ? Number(form.weight) : undefined,
+      achievements: form.achievements.length > 0 ? form.achievements : undefined,
+      paymentReceiptUrl: form.paymentReceiptUrl || undefined,
     };
 
     // Clean empty strings — let backend auto-assign clubId from JWT
@@ -233,126 +237,6 @@ export default function ClubAthletes(): React.ReactElement {
           </button>
         }
       />
-
-      <div className="table-card">
-        {persons.length === 0 ? (
-          <EmptyState
-            title="Aucun athlète"
-            description="Aucun athlète n'a encore été enregistré dans votre club."
-            action={
-              <button className="btn primary" onClick={openCreate}>
-                Ajouter un athlète
-              </button>
-            }
-          />
-        ) : (
-          <div className="table-wrap">
-            <table className="smart-table">
-              <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>Date de naissance</th>
-                  <th>Nationalité</th>
-                  <th>Documents</th>
-                  <th>Statut Licence</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {persons.map((p) => (
-                  <tr key={p._id || p.id}>
-                    <td>
-                      {p.firstName} {p.lastName}
-                    </td>
-                    <td>
-                      {p.dateOfBirth
-                        ? new Date(p.dateOfBirth).toLocaleDateString("fr-FR")
-                        : "—"}
-                    </td>
-                    <td>{p.nationality || "—"}</td>
-                    <td>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 4,
-                          fontSize: "0.85rem",
-                        }}
-                      >
-                        {(p as any).identityDocumentUrl ? (
-                          <a
-                            href={(p as any).identityDocumentUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              color: "var(--red)",
-                              textDecoration: "underline",
-                            }}
-                          >
-                            CIN
-                          </a>
-                        ) : null}
-                        {(p as any).birthCertificateUrl ? (
-                          <a
-                            href={(p as any).birthCertificateUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              color: "var(--red)",
-                              textDecoration: "underline",
-                            }}
-                          >
-                            Acte naissance
-                          </a>
-                        ) : null}
-                        {(p as any).photoUrl ? (
-                          <a
-                            href={(p as any).photoUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              color: "var(--red)",
-                              textDecoration: "underline",
-                            }}
-                          >
-                            Photo
-                          </a>
-                        ) : null}
-                        {!(p as any).identityDocumentUrl &&
-                        !(p as any).birthCertificateUrl &&
-                        !(p as any).photoUrl
-                          ? "—"
-                          : null}
-                      </div>
-                    </td>
-                    <td>
-                      <StatusBadge
-                        status={(p as any).licenseStatus || "PENDING"}
-                      />
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className="btn primary"
-                          onClick={() => openEdit(p)}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          className="btn danger"
-                          onClick={() => setDeleteTarget(p)}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
 
       {/* Create / Edit Modal */}
       {modalOpen && (
@@ -485,21 +369,6 @@ export default function ClubAthletes(): React.ReactElement {
                     ))}
                   </select>
                 </label>
-                <label className="field-label">
-                  Poids (kg)
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="20"
-                    max="200"
-                    placeholder="Ex: 73"
-                    value={form.weight}
-                    onChange={(e) =>
-                      setForm({ ...form, weight: e.target.value })
-                    }
-                    style={inputStyle}
-                  />
-                </label>
               </div>
 
               {/* Dynamic identity document upload */}
@@ -539,6 +408,27 @@ export default function ClubAthletes(): React.ReactElement {
                 />
               </div>
 
+              <div style={{ marginTop: 18 }}>
+                <FileUpload label="Reçu de paiement" accept=".pdf,.jpg,.jpeg,.png" maxSizeMB={5} onUploaded={(url) => setForm({ ...form, paymentReceiptUrl: url })} currentUrl={form.paymentReceiptUrl || null} />
+              </div>
+
+              <div style={{ marginTop: 20 }}>
+                <label className="field-label" style={{ marginBottom: 8 }}>Palmarès</label>
+                {form.achievements.map((ach, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                    <input type="text" value={ach}
+                      onChange={(e) => { const u = [...form.achievements]; u[i] = e.target.value; setForm({ ...form, achievements: u }); }}
+                      placeholder="Ex: 🥇 Champion National 2025" style={inputStyle} />
+                    <button type="button" className="btn danger" style={{ padding: "8px 12px" }}
+                      onClick={() => setForm({ ...form, achievements: form.achievements.filter((_, j) => j !== i) })}>✕</button>
+                  </div>
+                ))}
+                <button type="button" className="btn ghost" style={{ marginTop: 4 }}
+                  onClick={() => setForm({ ...form, achievements: [...form.achievements, ""] })}>
+                  + Ajouter un accomplissement
+                </button>
+              </div>
+
               <div
                 className="modal-actions"
                 style={{
@@ -563,6 +453,149 @@ export default function ClubAthletes(): React.ReactElement {
           </div>
         </div>
       )}
+
+      <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Rechercher par nom..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{
+            background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: "10px 16px", fontSize: "0.9rem", width: 300,
+          }}
+        />
+        {searchText && (
+          <button className="btn ghost" onClick={() => setSearchText("")}>
+            ✕ Effacer
+          </button>
+        )}
+        <span className="muted" style={{ fontSize: "0.85rem" }}>
+          {persons.length} résultat{persons.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      <div className="table-card">
+        {persons.length === 0 ? (
+          <EmptyState
+            title="Aucun athlète"
+            description="Aucun athlète n'a encore été enregistré dans votre club."
+            action={
+              <button className="btn primary" onClick={openCreate}>
+                Ajouter un athlète
+              </button>
+            }
+          />
+        ) : (
+          <div className="table-wrap">
+            <table className="smart-table">
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Date de naissance</th>
+                  <th>Nationalité</th>
+                  <th>Palmarès</th>
+                  <th>Documents</th>
+                  <th>Statut Licence</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {persons.map((p) => (
+                  <tr key={p._id || p.id}>
+                    <td>
+                      {p.firstName} {p.lastName}
+                    </td>
+                    <td>
+                      {p.dateOfBirth
+                        ? new Date(p.dateOfBirth).toLocaleDateString("fr-FR")
+                        : "—"}
+                    </td>
+                    <td>{p.nationality || "—"}</td>
+                    <td>{(p as any).achievements?.length || 0} titre{(p as any).achievements?.length !== 1 ? "s" : ""}</td>
+                    <td>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 4,
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        {(p as any).identityDocumentUrl ? (
+                          <a
+                            href={(p as any).identityDocumentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: "var(--red)",
+                              textDecoration: "underline",
+                            }}
+                          >
+                            CIN
+                          </a>
+                        ) : null}
+                        {(p as any).birthCertificateUrl ? (
+                          <a
+                            href={(p as any).birthCertificateUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: "var(--red)",
+                              textDecoration: "underline",
+                            }}
+                          >
+                            Acte naissance
+                          </a>
+                        ) : null}
+                        {(p as any).photoUrl ? (
+                          <a
+                            href={(p as any).photoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: "var(--red)",
+                              textDecoration: "underline",
+                            }}
+                          >
+                            Photo
+                          </a>
+                        ) : null}
+                        {!(p as any).identityDocumentUrl &&
+                        !(p as any).birthCertificateUrl &&
+                        !(p as any).photoUrl
+                          ? "—"
+                          : null}
+                      </div>
+                    </td>
+                    <td>
+                      <StatusBadge
+                        status={(p as any).licenseStatus || "PENDING"}
+                      />
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button
+                          className="btn primary"
+                          onClick={() => openEdit(p)}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          className="btn danger"
+                          onClick={() => setDeleteTarget(p)}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Delete Confirm */}
       <ConfirmDialog

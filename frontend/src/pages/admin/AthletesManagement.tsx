@@ -28,8 +28,9 @@ interface AthleteFormData {
   birthCertificateUrl: string;
   photoUrl: string;
   grade: string;
-  weight: string;
   clubId: string;
+  achievements: string[];
+  paymentReceiptUrl: string;
 }
 
 const emptyForm: AthleteFormData = {
@@ -43,8 +44,9 @@ const emptyForm: AthleteFormData = {
   birthCertificateUrl: "",
   photoUrl: "",
   grade: "",
-  weight: "",
   clubId: "",
+  achievements: [],
+  paymentReceiptUrl: "",
 };
 
 export default function AthletesManagement(): React.ReactElement {
@@ -54,6 +56,7 @@ export default function AthletesManagement(): React.ReactElement {
   const [form, setForm] = useState<AthleteFormData>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const {
     data: personsData,
@@ -62,9 +65,9 @@ export default function AthletesManagement(): React.ReactElement {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["persons", "ATHLETE"],
+    queryKey: ["persons", "ATHLETE", searchText],
     queryFn: async () => {
-      const res = await api.get("/persons", { params: { type: "ATHLETE" } });
+      const res = await api.get("/persons", { params: { type: "ATHLETE", search: searchText || undefined } });
       return (((res.data as any)?.data ?? res.data) as Person[]) || [];
     },
   });
@@ -112,8 +115,9 @@ export default function AthletesManagement(): React.ReactElement {
       birthCertificateUrl: ext.birthCertificateUrl || "",
       photoUrl: person.photoUrl || "",
       grade: person.grade || "",
-      weight: ext.weight != null ? String(ext.weight) : "",
       clubId: person.clubId || person.club?._id || person.club?.id || "",
+      achievements: Array.isArray(ext.achievements) ? ext.achievements : [],
+      paymentReceiptUrl: ext.paymentReceiptUrl || "",
     });
     setModalOpen(true);
   }
@@ -153,8 +157,9 @@ export default function AthletesManagement(): React.ReactElement {
       birthCertificateUrl: form.birthCertificateUrl || undefined,
       photoUrl: form.photoUrl || undefined,
       grade: form.grade.trim() || undefined,
-      weight: form.weight ? Number(form.weight) : undefined,
       clubId: form.clubId || undefined,
+      achievements: form.achievements.length > 0 ? form.achievements : undefined,
+      paymentReceiptUrl: form.paymentReceiptUrl || undefined,
     };
 
     // Clean empty values
@@ -207,6 +212,25 @@ export default function AthletesManagement(): React.ReactElement {
     padding: "11px 12px",
   };
 
+  const panelStyle: React.CSSProperties = {
+    background: "var(--bg)",
+    border: "1px solid var(--border)",
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 14,
+  };
+
+  const panelTitle: React.CSSProperties = {
+    color: "var(--red)",
+    fontSize: "0.8rem",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    marginBottom: 14,
+    paddingBottom: 8,
+    borderBottom: "1px solid var(--border)",
+  };
+
   if (isLoading) {
     return (
       <div className="page">
@@ -248,6 +272,27 @@ export default function AthletesManagement(): React.ReactElement {
         }
       />
 
+      <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Rechercher par nom..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{
+            background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: "10px 16px", fontSize: "0.9rem", width: 300,
+          }}
+        />
+        {searchText && (
+          <button className="btn ghost" onClick={() => setSearchText("")}>
+            ✕ Effacer
+          </button>
+        )}
+        <span className="muted" style={{ fontSize: "0.85rem" }}>
+          {persons.length} résultat{persons.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+
       {/* Create / Edit Modal */}
       {modalOpen && (
         <div className="modal-overlay" onClick={closeModal}>
@@ -260,186 +305,104 @@ export default function AthletesManagement(): React.ReactElement {
               {editingPerson ? "Modifier l'athlète" : "Ajouter un athlète"}
             </h3>
             <form onSubmit={handleSave} style={{ marginTop: 16 }}>
-              <div className="form-grid">
-                <label className="field-label">
-                  Prénom <span style={{ color: "var(--red)" }}>*</span>
-                  <input
-                    type="text"
-                    value={form.firstName}
-                    onChange={(e) =>
-                      setForm({ ...form, firstName: e.target.value })
-                    }
-                    placeholder="Prénom"
-                    required
-                    style={inputStyle}
-                  />
-                </label>
-                <label className="field-label">
-                  Nom <span style={{ color: "var(--red)" }}>*</span>
-                  <input
-                    type="text"
-                    value={form.lastName}
-                    onChange={(e) =>
-                      setForm({ ...form, lastName: e.target.value })
-                    }
-                    placeholder="Nom"
-                    required
-                    style={inputStyle}
-                  />
-                </label>
-                <label className="field-label">
-                  Date de naissance{" "}
-                  <span style={{ color: "var(--red)" }}>*</span>
-                  <input
-                    type="date"
-                    value={form.dateOfBirth}
-                    onChange={(e) =>
-                      setForm({ ...form, dateOfBirth: e.target.value })
-                    }
-                    required
-                    style={inputStyle}
-                  />
-                </label>
-                <label className="field-label">
-                  Nationalité
-                  <select
-                    value={form.nationality || "Tunisienne"}
-                    onChange={(e) =>
-                      setForm({ ...form, nationality: e.target.value })
-                    }
-                    style={inputStyle}
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field-label">
-                  Genre
-                  <select
-                    value={form.gender}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        gender: e.target.value as "MALE" | "FEMALE",
-                      })
-                    }
-                    style={inputStyle}
-                  >
-                    <option value="MALE">Homme</option>
-                    <option value="FEMALE">Femme</option>
-                  </select>
-                </label>
-                <label className="field-label">
-                  Type de pièce d'identité
-                  <select
-                    value={form.identityDocumentType}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        identityDocumentType: e.target.value as
-                          "CIN" | "BIRTH_CERTIFICATE",
-                      })
-                    }
-                    style={inputStyle}
-                  >
-                    <option value="CIN">CIN</option>
-                    <option value="BIRTH_CERTIFICATE">Acte de naissance</option>
-                  </select>
-                  {ageAtDOB < 18 && (
-                    <small style={{ color: "var(--gold)", marginTop: 4 }}>
-                      Mineur : l'acte de naissance est obligatoire
-                    </small>
-                  )}
-                </label>
-                <label className="field-label">
-                  Grade Newaza
-                  <select
-                    value={form.grade || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, grade: e.target.value })
-                    }
-                    style={inputStyle}
-                  >
-                    <option value="">Sélectionner un grade</option>
-                    {getGradesForRole("ATHLETE").map((g) => (
-                      <option key={g.value} value={g.value}>
-                        {g.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field-label">
-                  Poids (kg)
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="20"
-                    max="200"
-                    placeholder="Ex: 73"
-                    value={form.weight}
-                    onChange={(e) =>
-                      setForm({ ...form, weight: e.target.value })
-                    }
-                    style={inputStyle}
-                  />
-                </label>
-                <label className="field-label">
-                  Club
-                  <select
-                    value={form.clubId}
-                    onChange={(e) =>
-                      setForm({ ...form, clubId: e.target.value })
-                    }
-                    style={inputStyle}
-                  >
-                    <option value="">— Aucun —</option>
-                    {clubs.map((c) => (
-                      <option key={c._id || c.id} value={c._id || c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              {/* ── Panel 1: Informations personnelles ── */}
+              <div style={panelStyle}>
+                <div style={panelTitle}>📋 Informations personnelles</div>
+                <div className="form-grid">
+                  <label className="field-label">
+                    Prénom <span style={{ color: "var(--red)" }}>*</span>
+                    <input type="text" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} placeholder="Prénom" required style={inputStyle} />
+                  </label>
+                  <label className="field-label">
+                    Nom <span style={{ color: "var(--red)" }}>*</span>
+                    <input type="text" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} placeholder="Nom" required style={inputStyle} />
+                  </label>
+                  <label className="field-label">
+                    Date de naissance <span style={{ color: "var(--red)" }}>*</span>
+                    <input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} required style={inputStyle} />
+                  </label>
+                  <label className="field-label">
+                    Nationalité
+                    <select value={form.nationality || "Tunisienne"} onChange={(e) => setForm({ ...form, nationality: e.target.value })} style={inputStyle}>
+                      {COUNTRIES.map((c) => (<option key={c} value={c}>{c}</option>))}
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    Genre
+                    <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value as "MALE" | "FEMALE" })} style={inputStyle}>
+                      <option value="MALE">Homme</option>
+                      <option value="FEMALE">Femme</option>
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    Club
+                    <select value={form.clubId} onChange={(e) => setForm({ ...form, clubId: e.target.value })} style={inputStyle}>
+                      <option value="">— Aucun —</option>
+                      {clubs.map((c) => (<option key={c._id || c.id} value={c._id || c.id}>{c.name}</option>))}
+                    </select>
+                  </label>
+                </div>
               </div>
 
-              {/* Dynamic identity document upload */}
-              {form.identityDocumentType === "CIN" ? (
-                <div style={{ marginTop: 18 }}>
-                  <FileUpload
-                    label="Pièce d'identité (CIN)"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    maxSizeMB={5}
-                    onUploaded={(url) =>
-                      setForm({ ...form, identityDocumentUrl: url })
-                    }
-                    currentUrl={form.identityDocumentUrl || null}
-                  />
+              {/* ── Panel 2: Pièce d'identité & Documents ── */}
+              <div style={panelStyle}>
+                <div style={panelTitle}>🪪 Pièce d'identité & Documents</div>
+                <div className="form-grid">
+                  <label className="field-label">
+                    Type de pièce d'identité
+                    <select value={form.identityDocumentType} onChange={(e) => setForm({ ...form, identityDocumentType: e.target.value as "CIN" | "BIRTH_CERTIFICATE" })} style={inputStyle}>
+                      <option value="CIN">CIN</option>
+                      <option value="BIRTH_CERTIFICATE">Acte de naissance</option>
+                    </select>
+                    {ageAtDOB < 18 && (<small style={{ color: "var(--gold)", marginTop: 4 }}>Mineur : l'acte de naissance est obligatoire</small>)}
+                  </label>
                 </div>
-              ) : (
-                <div style={{ marginTop: 18 }}>
-                  <FileUpload
-                    label="Acte de naissance"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    maxSizeMB={5}
-                    onUploaded={(url) =>
-                      setForm({ ...form, birthCertificateUrl: url })
-                    }
-                    currentUrl={form.birthCertificateUrl || null}
-                  />
+                {form.identityDocumentType === "CIN" ? (
+                  <div style={{ marginTop: 14 }}>
+                    <FileUpload label="Pièce d'identité (CIN)" accept=".pdf,.jpg,.jpeg,.png" maxSizeMB={5} onUploaded={(url) => setForm({ ...form, identityDocumentUrl: url })} currentUrl={form.identityDocumentUrl || null} />
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 14 }}>
+                    <FileUpload label="Acte de naissance" accept=".pdf,.jpg,.jpeg,.png" maxSizeMB={5} onUploaded={(url) => setForm({ ...form, birthCertificateUrl: url })} currentUrl={form.birthCertificateUrl || null} />
+                  </div>
+                )}
+                <div style={{ marginTop: 14 }}>
+                  <FileUpload label="Photo" accept=".jpg,.jpeg,.png" maxSizeMB={5} onUploaded={(url) => setForm({ ...form, photoUrl: url })} currentUrl={form.photoUrl || null} />
                 </div>
-              )}
+                <div style={{ marginTop: 14 }}>
+                  <FileUpload label="Reçu de paiement" accept=".pdf,.jpg,.jpeg,.png" maxSizeMB={5} onUploaded={(url) => setForm({ ...form, paymentReceiptUrl: url })} currentUrl={form.paymentReceiptUrl || null} />
+                </div>
+              </div>
 
-              <div style={{ marginTop: 18 }}>
-                <FileUpload
-                  label="Photo"
-                  accept=".jpg,.jpeg,.png"
-                  maxSizeMB={5}
-                  onUploaded={(url) => setForm({ ...form, photoUrl: url })}
-                  currentUrl={form.photoUrl || null}
-                />
+              {/* ── Panel 3: Détails sportifs ── */}
+              <div style={panelStyle}>
+                <div style={panelTitle}>🥋 Détails sportifs</div>
+                <div className="form-grid">
+                  <label className="field-label">
+                    Grade Newaza
+                    <select value={form.grade || ""} onChange={(e) => setForm({ ...form, grade: e.target.value })} style={inputStyle}>
+                      <option value="">Sélectionner un grade</option>
+                      {getGradesForRole("ATHLETE").map((g) => (<option key={g.value} value={g.value}>{g.label}</option>))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 20 }}>
+                <label className="field-label" style={{ marginBottom: 8 }}>Palmarès</label>
+                {form.achievements.map((ach, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                    <input type="text" value={ach}
+                      onChange={(e) => { const u = [...form.achievements]; u[i] = e.target.value; setForm({ ...form, achievements: u }); }}
+                      placeholder="Ex: 🥇 Champion National 2025" style={inputStyle} />
+                    <button type="button" className="btn danger" style={{ padding: "8px 12px" }}
+                      onClick={() => setForm({ ...form, achievements: form.achievements.filter((_, j) => j !== i) })}>✕</button>
+                  </div>
+                ))}
+                <button type="button" className="btn ghost" style={{ marginTop: 4 }}
+                  onClick={() => setForm({ ...form, achievements: [...form.achievements, ""] })}>
+                  + Ajouter un accomplissement
+                </button>
               </div>
 
               <div
@@ -489,6 +452,7 @@ export default function AthletesManagement(): React.ReactElement {
                   <th>Nationalité</th>
                   <th>Genre</th>
                   <th>Club</th>
+                  <th>Palmarès</th>
                   <th>Documents</th>
                   <th>Actions</th>
                 </tr>
@@ -514,6 +478,7 @@ export default function AthletesManagement(): React.ReactElement {
                           : "—"}
                     </td>
                     <td>{p.club?.name || "—"}</td>
+                    <td>{(p as any).achievements?.length || 0} titre{(p as any).achievements?.length !== 1 ? "s" : ""}</td>
                     <td>
                       <div
                         style={{
