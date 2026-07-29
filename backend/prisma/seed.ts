@@ -7,11 +7,111 @@ import {
   IdentityDocumentType,
 } from "@prisma/client";
 import * as bcrypt from "bcrypt";
+import * as fs from "fs";
+import * as path from "path";
 
 const prisma = new PrismaClient();
 
+// Simple display ID generator (matching backend utility)
+function generateDisplayId(uuid: string, attempt = 0): string {
+  const hex = uuid.replace(/-/g, "");
+  const offsets = [12, 0, 4, 8, 16, 20];
+  const offset = offsets[attempt % offsets.length];
+  const slice = hex.slice(offset, offset + 12).padEnd(12, "0");
+  let num = BigInt("0x" + slice);
+  if (num === 0n) num = BigInt("0x" + hex.slice(0, 12));
+  const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let result = "";
+  while (num > 0n) {
+    result = chars[Number(num % 36n)] + result;
+    num = num / 36n;
+  }
+  return result.padStart(8, "0").slice(0, 8) || "00000000";
+}
+
+async function assignDisplayIds() {
+  const persons = await prisma.person.findMany({ where: { displayId: null }, select: { id: true } });
+  for (const p of persons) {
+    let displayId: string;
+    let attempt = 0;
+    do {
+      displayId = generateDisplayId(p.id, attempt);
+      const exists = await prisma.person.findUnique({ where: { displayId }, select: { id: true } });
+      if (!exists) break;
+      attempt++;
+    } while (attempt < 10);
+    await prisma.person.update({ where: { id: p.id }, data: { displayId } });
+  }
+  if (persons.length > 0) console.log(`✅ ${persons.length} displayIds attribués`);
+}
+
+// ==========================================
+// Seeded photos helper
+// ==========================================
+const PHOTOS_DIR = path.join(process.cwd(), "uploads", "photos");
+const availablePhotos: string[] = [];
+
+function loadPhotos(): void {
+  if (!fs.existsSync(PHOTOS_DIR)) {
+    console.warn("⚠️  Dossier photos introuvable:", PHOTOS_DIR);
+    return;
+  }
+  const files = fs.readdirSync(PHOTOS_DIR);
+  for (const file of files) {
+    if (/\.(jpg|jpeg|png|webp|gif)$/i.test(file)) {
+      availablePhotos.push(`/uploads/photos/${file}`);
+    }
+  }
+  console.log(`📸 ${availablePhotos.length} photos trouvées dans uploads/photos/`);
+}
+
+function randomPhoto(): string | undefined {
+  if (availablePhotos.length === 0) return undefined;
+  return availablePhotos[Math.floor(Math.random() * availablePhotos.length)];
+}
+
+// ==========================================
+// Clean the entire database before seeding
+// ==========================================
+async function cleanDatabase() {
+  console.log("🧹 Nettoyage de la base de données...\n");
+
+  // Delete in dependency order (children first, then parents)
+  await prisma.featuredMedia.deleteMany();
+  await prisma.match.deleteMany();
+  await prisma.teamMember.deleteMany();
+  await prisma.team.deleteMany();
+  await prisma.mat.deleteMany();
+  await prisma.competitionSignup.deleteMany();
+  await prisma.competitionDocument.deleteMany();
+  await prisma.registrationRequest.deleteMany();
+  await prisma.license.deleteMany();
+  await prisma.athlete.deleteMany();
+  await prisma.coach.deleteMany();
+  await prisma.referee.deleteMany();
+  await prisma.technician.deleteMany();
+  await prisma.person.deleteMany();
+  await prisma.clubDocument.deleteMany();
+  await prisma.refreshToken.deleteMany();
+  await prisma.club.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.pricing.deleteMany();
+  await prisma.competition.deleteMany();
+  await prisma.season.deleteMany();
+  await prisma.article.deleteMany();
+  await prisma.document.deleteMany();
+
+  console.log("✅ Base de données nettoyée avec succès.\n");
+}
+
 async function main() {
   console.log("🌱 Démarrage du seeding...\n");
+
+  // Clean first
+  await cleanDatabase();
+
+  // Load available photos
+  loadPhotos();
 
   // ==========================================
   // 1. Create default admin user
@@ -26,6 +126,7 @@ async function main() {
     await prisma.user.create({
       data: {
         email: adminEmail,
+        username: "admin",
         password: adminPassword,
         role: Role.ADMIN,
         isApproved: true,
@@ -43,92 +144,92 @@ async function main() {
   // ==========================================
   const pricingItems = [
     {
-      name: "Inscription Annuelle 120dt",
+      name: "Inscription Annuelle",
       amount: 120.0,
       category: LicenseCategory.LICENSE,
     },
     {
-      name: "License Coach 40dt",
+      name: "License Coach",
       amount: 40.0,
       category: LicenseCategory.LICENSE,
     },
     {
-      name: "License Technicien 20dt",
+      name: "License Technicien",
       amount: 20.0,
       category: LicenseCategory.LICENSE,
     },
     {
-      name: "License Athlete 15dt (Male)",
+      name: "License Athlete (Homme)",
       amount: 15.0,
       category: LicenseCategory.LICENSE,
     },
     {
-      name: "License Athlete 5dt (Female)",
+      name: "License Athlete (Femme)",
       amount: 5.0,
       category: LicenseCategory.LICENSE,
     },
     {
-      name: "Stage passage de grade 10dt",
+      name: "Stage passage de grade",
       amount: 10.0,
       category: LicenseCategory.STAGE,
     },
     {
-      name: "Recyclage coach et arbitres 10dt",
+      name: "Recyclage coach et arbitres",
       amount: 10.0,
       category: LicenseCategory.STAGE,
     },
     {
-      name: "Passage de Grade Marron 50dt",
+      name: "Passage de Grade — Marron",
       amount: 50.0,
       category: LicenseCategory.PASSAGE_GRADE,
     },
     {
-      name: "Passage de Grade Black Belt ou + 100dt",
+      name: "Passage de Grade — Black Belt et +",
       amount: 100.0,
       category: LicenseCategory.PASSAGE_GRADE,
     },
     {
-      name: "Passage de Grade Arbitre 1er degree 100dt",
+      name: "Passage de Grade Arbitre — 1er degré",
       amount: 100.0,
       category: LicenseCategory.PASSAGE_GRADE,
     },
     {
-      name: "Passage de Grade Arbitre 2eme degree 120dt",
+      name: "Passage de Grade Arbitre — 2ème degré",
       amount: 120.0,
       category: LicenseCategory.PASSAGE_GRADE,
     },
     {
-      name: "Passage de Grade Arbitre 3eme degree 150dt",
+      name: "Passage de Grade Arbitre — 3ème degré",
       amount: 150.0,
       category: LicenseCategory.PASSAGE_GRADE,
     },
     {
-      name: "Coach federale 400dt",
+      name: "Coach fédéral",
       amount: 400.0,
       category: LicenseCategory.LICENSE,
     },
     {
-      name: "Participation Competition 10dt",
+      name: "Participation Compétition",
       amount: 10.0,
       category: LicenseCategory.COMPETITION,
     },
     {
-      name: "Participation Qualifications 10dt",
+      name: "Participation Qualifications",
       amount: 10.0,
       category: LicenseCategory.COMPETITION,
     },
     {
-      name: "Participation Jeu Finals 10dt",
+      name: "Participation Jeux Finals",
       amount: 10.0,
       category: LicenseCategory.COMPETITION,
     },
     {
-      name: "Assurance Competition 15dt (Male)",
+      name: "Assurance Compétition (Homme)",
       amount: 15.0,
       category: LicenseCategory.COMPETITION,
     },
     {
-      name: "Assurance Competition 5dt (Female)",
+      name: "Assurance Compétition (Femme)",
       amount: 5.0,
       category: LicenseCategory.COMPETITION,
     },
@@ -149,6 +250,23 @@ async function main() {
   );
 
   // ==========================================
+  // 2b. Seed default season
+  // ==========================================
+  const existingSeason = await prisma.season.findFirst({ where: { isCurrent: true } });
+  if (!existingSeason) {
+    await prisma.season.create({
+      data: {
+        name: "2026/2027",
+        isCurrent: true,
+        startsAt: new Date("2026-09-01"),
+        endsAt: new Date("2027-08-31"),
+        registrationClosesAt: new Date("2027-06-30"),
+      },
+    });
+    console.log("✅ Saison 2026/2027 créée et activée");
+  }
+
+  // ==========================================
   // 3. Optional: Create sample club and persons
   // ==========================================
   const existingClubs = await prisma.club.count();
@@ -158,6 +276,7 @@ async function main() {
     const clubOwner = await prisma.user.create({
       data: {
         email: "club@example.com",
+        username: "club",
         password: samplePassword,
         role: Role.CLUB_OWNER,
         isApproved: true,
@@ -183,6 +302,7 @@ async function main() {
           dateOfBirth: new Date("1998-03-15"),
           nationality: "Tunisienne",
           gender: Gender.MALE,
+          photoUrl: randomPhoto(),
           identityDocumentType: IdentityDocumentType.CIN,
           identityDocumentUrl: "/uploads/documents/cin-placeholder.pdf",
           type: PersonType.ATHLETE,
@@ -200,12 +320,13 @@ async function main() {
           dateOfBirth: new Date("2008-07-22"),
           nationality: "Tunisienne",
           gender: Gender.MALE,
+          photoUrl: randomPhoto(),
           identityDocumentType: IdentityDocumentType.BIRTH_CERTIFICATE,
           identityDocumentUrl: "/uploads/documents/birth-cert-placeholder.pdf",
           type: PersonType.ATHLETE,
           clubId: clubOwner.club.id,
           athleteDetails: {
-            create: { grade: "Ceinture Jaune" },
+            create: { grade: "Ceinture Bleue" },
           },
         },
       });
@@ -217,6 +338,7 @@ async function main() {
           dateOfBirth: new Date("1985-11-03"),
           nationality: "Tunisienne",
           gender: Gender.MALE,
+          photoUrl: randomPhoto(),
           identityDocumentType: IdentityDocumentType.CIN,
           identityDocumentUrl: "/uploads/documents/cin-placeholder.pdf",
           type: PersonType.COACH,
@@ -239,6 +361,7 @@ async function main() {
     await prisma.user.create({
       data: {
         email: "nouveau.club@example.com",
+        username: "nouveauclub",
         password: samplePassword,
         role: Role.CLUB_OWNER,
         isApproved: false,
@@ -276,7 +399,7 @@ async function main() {
     if (!club) {
       const pw = await bcrypt.hash("Club123!", 12);
       const owner = await prisma.user.create({
-        data: { email: "testclub@example.com", password: pw, role: Role.CLUB_OWNER, isApproved: true,
+        data: { email: "testclub@example.com", username: "testclub", password: pw, role: Role.CLUB_OWNER, isApproved: true,
           club: { create: { name: "Club Test Competition", address: "Tunis" } } },
         include: { club: true },
       });
@@ -322,6 +445,7 @@ async function main() {
         data: {
           firstName: a.firstName, lastName: a.lastName, dateOfBirth: new Date(a.dob),
           nationality: "Tunisienne", gender: a.gender,
+          photoUrl: randomPhoto(),
           identityDocumentType: IdentityDocumentType.CIN, identityDocumentUrl: "/uploads/documents/cin-placeholder.pdf",
           type: PersonType.ATHLETE, clubId: club.id,
           athleteDetails: { create: { grade: a.grade, weight: a.weight } },
@@ -379,6 +503,11 @@ async function main() {
     }
     console.log(`✅ ${uncoded.length} codes d'athlète attribués (ATHTJJF${nextNum - uncoded.length} → ATHTJJF${nextNum - 1})`);
   }
+
+  // ==========================================
+  // 6. Assign short display IDs to persons without one
+  // ==========================================
+  await assignDisplayIds();
 
   console.log("\n🎉 Seeding terminé avec succès !");
   console.log("================================");

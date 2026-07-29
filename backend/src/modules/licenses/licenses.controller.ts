@@ -31,6 +31,11 @@ class CreateLicenseDto {
   @IsOptional()
   @IsString()
   paymentReceiptUrl?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  medicalCertificateUrl?: string;
 }
 
 class ApproveRejectDto {

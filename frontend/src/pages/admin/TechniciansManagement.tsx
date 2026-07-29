@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
+import { useDebounce } from "../../hooks/useDebounce";
 import api from "../../services/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -20,6 +21,8 @@ interface Club {
 interface TechnicianFormData {
   firstName: string;
   lastName: string;
+  arabicFirstName?: string;
+  arabicLastName?: string;
   dateOfBirth: string;
   nationality: string;
   gender: "MALE" | "FEMALE";
@@ -36,6 +39,8 @@ interface TechnicianFormData {
 const emptyForm: TechnicianFormData = {
   firstName: "",
   lastName: "",
+  arabicFirstName: "",
+  arabicLastName: "",
   dateOfBirth: "",
   nationality: "Tunisienne",
   gender: "MALE",
@@ -56,7 +61,8 @@ export default function TechniciansManagement(): React.ReactElement {
   const [form, setForm] = useState<TechnicianFormData>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
-  const [searchText, setSearchText] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const searchText = useDebounce(searchInput, 300);
 
   const {
     data: personsData,
@@ -65,9 +71,9 @@ export default function TechniciansManagement(): React.ReactElement {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["persons", "TECHNICIAN", searchText],
+    queryKey: ["persons", "TECHNICIAN"],
     queryFn: async () => {
-      const res = await api.get("/persons", { params: { type: "TECHNICIAN", search: searchText || undefined } });
+      const res = await api.get("/persons", { params: { type: "TECHNICIAN" } });
       return (((res.data as any)?.data ?? res.data) as Person[]) || [];
     },
   });
@@ -80,8 +86,18 @@ export default function TechniciansManagement(): React.ReactElement {
     },
   });
 
-  const persons = personsData || [];
+  const allPersons = personsData || [];
   const clubs = clubsData || [];
+
+  // Client-side filtering
+  const persons = useMemo(() => {
+    if (!searchText.trim()) return allPersons;
+    const q = searchText.toLowerCase();
+    return allPersons.filter((p: any) => {
+      const fullName = `${p.firstName || ""} ${p.lastName || ""}`.toLowerCase();
+      return fullName.includes(q);
+    });
+  }, [allPersons, searchText]);
 
   function openCreate() {
     setEditingPerson(null);
@@ -95,6 +111,8 @@ export default function TechniciansManagement(): React.ReactElement {
     setForm({
       firstName: person.firstName || "",
       lastName: person.lastName || "",
+      arabicFirstName: ext.arabicFirstName || "",
+      arabicLastName: ext.arabicLastName || "",
       dateOfBirth: person.dateOfBirth ? person.dateOfBirth.slice(0, 10) : "",
       nationality: person.nationality || "Tunisienne",
       gender: person.gender || "MALE",
@@ -127,6 +145,8 @@ export default function TechniciansManagement(): React.ReactElement {
       type: "TECHNICIAN",
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
+      arabicFirstName: form.arabicFirstName?.trim() || undefined,
+      arabicLastName: form.arabicLastName?.trim() || undefined,
       dateOfBirth: form.dateOfBirth || undefined,
       nationality: form.nationality.trim(),
       gender: form.gender,
@@ -230,19 +250,16 @@ export default function TechniciansManagement(): React.ReactElement {
         }
       />
 
-      <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+      <div className="admin-search-bar">
         <input
           type="text"
+          className="admin-search-input"
           placeholder="Rechercher par nom..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          style={{
-            background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)",
-            borderRadius: 12, padding: "10px 16px", fontSize: "0.9rem", width: 300,
-          }}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
         />
-        {searchText && (
-          <button className="btn ghost" onClick={() => setSearchText("")}>
+        {searchInput && (
+          <button className="btn ghost" onClick={() => setSearchInput("")}>
             ✕ Effacer
           </button>
         )}
@@ -389,6 +406,12 @@ export default function TechniciansManagement(): React.ReactElement {
                     style={inputStyle}
                   />
                 </label>
+                <input type="text" value={form.arabicFirstName || ""}
+                  onChange={(e) => setForm({ ...form, arabicFirstName: e.target.value })}
+                  placeholder="الاسم (Prénom en arabe)" style={inputStyle} />
+                <input type="text" value={form.arabicLastName || ""}
+                  onChange={(e) => setForm({ ...form, arabicLastName: e.target.value })}
+                  placeholder="اللقب (Nom en arabe)" style={inputStyle} />
                 <label className="field-label">
                   Date de naissance
                   <input
@@ -526,12 +549,13 @@ export default function TechniciansManagement(): React.ReactElement {
 
               <div style={{ marginTop: 18 }}>
                 <FileUpload
-                  label="Photo"
-                  accept=".jpg,.jpeg,.png"
-                  maxSizeMB={5}
-                  onUploaded={(url) => setForm({ ...form, photoUrl: url })}
-                  currentUrl={form.photoUrl || null}
-                />
+                    label="Photo"
+                    accept=".jpg,.jpeg,.png"
+                    hint="Dimensions recommandées : 300×400 px (portrait)"
+                    maxSizeMB={5}
+                    onUploaded={(url) => setForm({ ...form, photoUrl: url })}
+                    currentUrl={form.photoUrl || null}
+                  />
               </div>
 
               <div style={{ marginTop: 18 }}>

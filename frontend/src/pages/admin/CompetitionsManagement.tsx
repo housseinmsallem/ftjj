@@ -1900,6 +1900,7 @@ export default function CompetitionsManagement(): React.ReactElement {
                 <FileUpload
                   label="Affiche (poster)"
                   accept=".jpg,.jpeg,.png,.webp"
+                  hint="Dimensions recommandées : 600×900 px (portrait)"
                   onUploaded={(url) => setForm({ ...form, posterUrl: url })}
                   currentUrl={form.posterUrl || null}
                 />

@@ -133,22 +133,22 @@ export default function AdminAthleteCorrection(): React.ReactElement {
       />
 
       {/* Search Section */}
-      <div className="card" style={{ marginBottom: 20, maxWidth: 700 }}>
-        <h3 style={{ color: "var(--text)", marginBottom: 16 }}>
+      <div className="admin-search-bar" style={{ maxWidth: 700 }}>
+        <h3 style={{ color: "var(--text)", marginBottom: 0, width: "100%" }}>
           Rechercher un athlète
         </h3>
         <form
           onSubmit={handleSearch}
-          style={{ display: "flex", gap: 10, alignItems: "flex-end" }}
+          style={{ display: "flex", gap: 10, alignItems: "flex-end", width: "100%" }}
         >
           <label className="field-label" style={{ flex: 1 }}>
             Nom ou prénom
             <input
               type="text"
+              className="admin-search-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher par nom ou prénom..."
-              style={inputStyle}
             />
           </label>
           <button type="submit" className="btn primary" style={{ height: 44 }}>

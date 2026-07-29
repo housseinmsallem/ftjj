@@ -15,6 +15,7 @@ import { PublicModule } from "./modules/public/public.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
 import { ScoringModule } from "./modules/scoring/scoring.module";
 import { CmsModule } from "./modules/cms/cms.module";
+import { SeasonsModule } from "./modules/seasons/seasons.module";
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { CmsModule } from "./modules/cms/cms.module";
     PublicModule,
     DashboardModule,
     CmsModule,
+    SeasonsModule,
   ],
 })
 export class AppModule {}

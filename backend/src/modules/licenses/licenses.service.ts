@@ -20,25 +20,10 @@ export class LicensesService {
     clubId?: string;
     isActive?: boolean;
     validatedByAdmin?: boolean;
+    seasonId?: string;
   }) {
-    // Auto-deactivate licenses on September 1st each year
-    const now = new Date();
-    if (now.getMonth() >= 8 && now.getDate() >= 1) {
-      // Check if deactivation was already done this season
-      const anyActive = await this.prisma.license.count({ where: { isActive: true } });
-      if (anyActive > 0) {
-        // Only deactivate if licenses were issued before September 1st
-        const oldLicenses = await this.prisma.license.count({
-          where: { isActive: true, issuedAt: { lt: new Date(now.getFullYear(), 8, 1) } },
-        });
-        if (oldLicenses > 0) {
-          await this.prisma.license.updateMany({
-            where: { isActive: true, issuedAt: { lt: new Date(now.getFullYear(), 8, 1) } },
-            data: { isActive: false },
-          });
-        }
-      }
-    }
+    // Fetch current season for expiry computation
+    const currentSeason = await this.prisma.season.findFirst({ where: { isCurrent: true } });
 
     const where: any = {};
 
@@ -46,6 +31,7 @@ export class LicensesService {
     if (filters.isActive !== undefined) where.isActive = filters.isActive;
     if (filters.validatedByAdmin !== undefined)
       where.validatedByAdmin = filters.validatedByAdmin;
+    if (filters.seasonId) where.seasonId = filters.seasonId;
     if (filters.clubId) {
       where.person = { clubId: filters.clubId };
     }
@@ -54,15 +40,22 @@ export class LicensesService {
       where,
       include: {
         person: {
-          select: { id: true, firstName: true, lastName: true, type: true },
+          select: { id: true, firstName: true, lastName: true, arabicFirstName: true, arabicLastName: true, type: true },
         },
         pricing: true,
+        season: true,
         registrationRequest: true,
       },
       orderBy: { issuedAt: "desc" },
     });
 
-    return { data: licenses };
+    // Mark licenses as expired if their season does not match the current season
+    const enriched = licenses.map(l => ({
+      ...l,
+      isExpired: currentSeason ? l.seasonId !== currentSeason.id : false,
+    }));
+
+    return { data: enriched, currentSeason };
   }
 
   async findOne(id: string) {
@@ -74,12 +67,17 @@ export class LicensesService {
             id: true,
             firstName: true,
             lastName: true,
+            arabicFirstName: true,
+            arabicLastName: true,
+            code: true,
+            photoUrl: true,
             dateOfBirth: true,
             type: true,
             club: { select: { id: true, name: true } },
           },
         },
         pricing: true,
+        season: true,
         registrationRequest: true,
       },
     });
@@ -96,6 +94,7 @@ export class LicensesService {
       personId: string;
       pricingId: string;
       paymentReceiptUrl?: string;
+      medicalCertificateUrl?: string;
     },
     user?: { id: string; role: Role },
   ) {
@@ -135,6 +134,9 @@ export class LicensesService {
     const expiryDate = new Date();
     expiryDate.setFullYear(expiryDate.getFullYear() + 1);
 
+    // Fetch the current season
+    const currentSeason = await this.prisma.season.findFirst({ where: { isCurrent: true } });
+
     // Admin creates directly approved; Club owner creates pending request
     if (user && user.role === Role.ADMIN) {
       const license = await this.prisma.license.create({
@@ -143,6 +145,9 @@ export class LicensesService {
           pricingId: data.pricingId,
           expiryDate,
           paymentReceiptUrl: data.paymentReceiptUrl,
+          medicalCertificateUrl: data.medicalCertificateUrl,
+          licenseType: "A",
+          seasonId: currentSeason?.id || null,
           validatedByAdmin: true,
           isActive: true,
         },

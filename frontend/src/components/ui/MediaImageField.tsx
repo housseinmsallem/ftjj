@@ -12,9 +12,10 @@ interface MediaImageFieldProps {
   value: string;
   onChange: (url: string) => void;
   label?: string;
+  hint?: string;
 }
 
-export default function MediaImageField({ value, onChange, label }: MediaImageFieldProps): React.ReactElement {
+export default function MediaImageField({ value, onChange, label, hint }: MediaImageFieldProps): React.ReactElement {
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -53,6 +54,11 @@ export default function MediaImageField({ value, onChange, label }: MediaImageFi
   return (
     <>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+        {hint && (
+          <small style={{ display: "block", fontSize: "0.75rem", color: "var(--muted, #64748b)", fontStyle: "italic", margin: 0, marginBottom: 2 }}>
+            {hint}
+          </small>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <input
             type="text"

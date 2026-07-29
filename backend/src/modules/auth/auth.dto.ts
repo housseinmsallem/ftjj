@@ -8,9 +8,15 @@ import {
 import { ApiProperty } from "@nestjs/swagger";
 
 export class LoginDto {
-  @ApiProperty({ example: "admin@ftjj.tn" })
+  @ApiProperty({ example: "admin", required: false })
+  @IsOptional()
+  @IsString()
+  username?: string;
+
+  @ApiProperty({ example: "admin@ftjj.tn", required: false })
+  @IsOptional()
   @IsEmail({}, { message: "L'adresse email n'est pas valide" })
-  email: string;
+  email?: string;
 
   @ApiProperty({ example: "Admin123!" })
   @IsString({ message: "Le mot de passe doit être une chaîne de caractères" })

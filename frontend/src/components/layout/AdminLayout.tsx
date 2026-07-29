@@ -17,6 +17,7 @@ const adminNavItems = [
   { to: "/admin/technicians", label: "Gestion des techniciens", icon: "🔧" },
   { to: "/admin/licenses", label: "Licences", icon: "📜" },
   { to: "/admin/competitions", label: "Compétitions", icon: "🏆" },
+  { to: "/admin/seasons", label: "Saisons", icon: "📅" },
   { to: "/admin/import", label: "Importation CSV", icon: "📥" },
   { to: "/admin/transfers", label: "Transferts", icon: "🔄" },
   { to: "/admin/cms", label: "CMS", icon: "🎨" },

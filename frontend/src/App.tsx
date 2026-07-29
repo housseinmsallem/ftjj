@@ -18,6 +18,8 @@ import ContactPage from "./pages/ContactPage";
 import LicensedSpacePage from "./pages/LicensedSpacePage";
 import PublicDirectory from "./pages/PublicDirectory";
 import ClubAffiliation from "./pages/ClubAffiliation";
+import RefereeRegister from "./pages/RefereeRegister";
+import RefereeDashboard from "./pages/RefereeDashboard";
 import PublicFightDisplay from "./pages/public/PublicFightDisplay";
 import SpectatorWindow from "./pages/public/SpectatorWindow";
 import IdentiteFederale from "./pages/IdentiteFederale";
@@ -48,6 +50,7 @@ import RefereesManagement from "./pages/admin/RefereesManagement";
 import TechniciansManagement from "./pages/admin/TechniciansManagement";
 import LicensesManagement from "./pages/admin/LicensesManagement";
 import CompetitionsManagement from "./pages/admin/CompetitionsManagement";
+import AdminSeasons from "./pages/admin/AdminSeasons";
 import CsvImport from "./pages/admin/CsvImport";
 import LiveMatchControl from "./pages/admin/LiveMatchControl";
 import CmsDashboard from "./pages/admin/CmsDashboard";
@@ -124,6 +127,7 @@ function AppRoutes(): React.ReactElement {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/espace-licencie" element={<LicensedSpacePage />} />
             <Route path="/affiliation" element={<ClubAffiliation />} />
+            <Route path="/arbitre/inscription" element={<RefereeRegister />} />
             <Route path="/clubs" element={<PublicDirectory type="clubs" />} />
             <Route
               path="/athletes"
@@ -238,6 +242,10 @@ function AppRoutes(): React.ReactElement {
               path="/admin/competitions"
               element={adminRoute(<CompetitionsManagement />)}
             />
+            <Route
+              path="/admin/seasons"
+              element={adminRoute(<AdminSeasons />)}
+            />
             <Route path="/admin/import" element={adminRoute(<CsvImport />)} />
             <Route
               path="/admin/export"
@@ -312,7 +320,7 @@ function AppRoutes(): React.ReactElement {
             />
             <Route
               path="/referee/dashboard"
-              element={authenticatedRoute(<MemberDashboard role="REFEREE" />)}
+              element={authenticatedRoute(<RefereeDashboard />)}
             />
 
             {/* ========== FALLBACK ========== */}

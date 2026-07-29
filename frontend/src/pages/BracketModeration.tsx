@@ -29,6 +29,10 @@ export default function BracketModeration(): React.ReactElement {
   const [editMode, setEditMode] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState<{ matchId: string; side: 'red' | 'blue' } | null>(null);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [champions, setChampions] = useState<Record<string, boolean>>({});
+  const [teams, setTeams] = useState<any[]>([]);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [addMemberTeamId, setAddMemberTeamId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!competitionId || !token) return;
@@ -62,6 +66,7 @@ export default function BracketModeration(): React.ReactElement {
         if (d.categoryMatches) {
           setCategoryMatches(d.categoryMatches);
         }
+        fetchTeams();
       })
       .catch((e) => { setError(e.response?.data?.message || "Accès refusé"); })
       .finally(() => setLoading(false));
@@ -95,6 +100,64 @@ export default function BracketModeration(): React.ReactElement {
     },
     [],
   );
+
+  async function toggleChampion(signupId: string, current: boolean) {
+    const next = !current;
+    setChampions((prev) => ({ ...prev, [signupId]: next }));
+    try {
+      await api.patch(`/competitions/moderate/${competitionId}/signups/${signupId}/champion?token=${token}`, { isFormerChampion: next });
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          signups: prev.signups.map((s: any) =>
+            (s.id === signupId || s._id === signupId) ? { ...s, isFormerChampion: next } : s,
+          ),
+        };
+      });
+    } catch {
+      setChampions((prev) => ({ ...prev, [signupId]: current }));
+    }
+  }
+
+  // ─── Team helpers ───
+  async function fetchTeams() {
+    try {
+      const r = await api.get(`/competitions/moderate/${competitionId}/teams?token=${token}`);
+      setTeams(r.data || []);
+    } catch { /* silent */ }
+  }
+
+  async function createTeam() {
+    if (!newTeamName.trim()) return;
+    try {
+      await api.post(`/competitions/moderate/${competitionId}/teams?token=${token}`, { name: newTeamName.trim() });
+      setNewTeamName("");
+      await fetchTeams();
+    } catch { alert("Erreur lors de la création de l'équipe"); }
+  }
+
+  async function addTeamMember(teamId: string, personId: string) {
+    try {
+      await api.post(`/competitions/moderate/${competitionId}/teams/${teamId}/members?token=${token}`, { personId });
+      await fetchTeams();
+    } catch { /* silent */ }
+  }
+
+  async function removeTeamMember(teamId: string, personId: string) {
+    try {
+      await api.delete(`/competitions/moderate/${competitionId}/teams/${teamId}/members/${personId}?token=${token}`);
+      await fetchTeams();
+    } catch { /* silent */ }
+  }
+
+  async function deleteTeam(teamId: string) {
+    if (!confirm("Supprimer cette équipe ?")) return;
+    try {
+      await api.delete(`/competitions/moderate/${competitionId}/teams/${teamId}?token=${token}`);
+      await fetchTeams();
+    } catch { alert("Erreur"); }
+  }
 
   async function handleGenBrackets() {
     setGenLoading(true);
@@ -395,9 +458,19 @@ export default function BracketModeration(): React.ReactElement {
                           } else {
                             const prevMatches = byRound[rounds[ri - 1]].sort((a: any, b: any) => (a.bracketPosition || 1) - (b.bracketPosition || 1));
                             for (let j = 0; j < rMatches.length; j++) {
-                              const prevA = positions[prevMatches[j * 2]?.id || prevMatches[j * 2]?._id || `r${rounds[ri-1]}j${j*2}`];
-                              const prevB = prevMatches[j * 2 + 1] ? positions[prevMatches[j * 2 + 1]?.id || prevMatches[j * 2 + 1]?._id || `r${rounds[ri-1]}j${j*2+1}`] : null;
-                              const yCenter = prevB ? (prevA.y + CARD_H / 2 + prevB.y + CARD_H / 2) / 2 : prevA.y + CARD_H / 2;
+                              const prevAKey = prevMatches[j * 2]?.id || prevMatches[j * 2]?._id || `r${rounds[ri-1]}j${j*2}`;
+                              const prevA = positions[prevAKey];
+                              const prevBKey = prevMatches[j * 2 + 1]?.id || prevMatches[j * 2 + 1]?._id || `r${rounds[ri-1]}j${j*2+1}`;
+                              const prevB = prevMatches[j * 2 + 1] ? positions[prevBKey] : null;
+                              let yCenter: number;
+                              if (!prevA) {
+                                // Previous round has fewer matches than expected — place below last visible card
+                                yCenter = totalH + CARD_H / 2 + 40;
+                              } else if (prevB) {
+                                yCenter = (prevA.y + CARD_H / 2 + prevB.y + CARD_H / 2) / 2;
+                              } else {
+                                yCenter = prevA.y + CARD_H / 2;
+                              }
                               positions[rMatches[j].id || rMatches[j]._id || `r${round}j${j}`] = { x, y: yCenter - CARD_H / 2, w: CARD_W, h: CARD_H };
                             }
                           }
@@ -408,10 +481,12 @@ export default function BracketModeration(): React.ReactElement {
                           const prevMatches = byRound[rounds[ri - 1]].sort((a: any, b: any) => (a.bracketPosition || 1) - (b.bracketPosition || 1));
                           const currMatches = byRound[rounds[ri]].sort((a: any, b: any) => (a.bracketPosition || 1) - (b.bracketPosition || 1));
                           for (let j = 0; j < currMatches.length; j++) {
-                            const prevA = positions[prevMatches[j * 2]?.id || prevMatches[j * 2]?._id || `r${rounds[ri-1]}j${j*2}`];
-                            const prevB = prevMatches[j * 2 + 1] ? positions[prevMatches[j * 2 + 1]?.id || prevMatches[j * 2 + 1]?._id || `r${rounds[ri-1]}j${j*2+1}`] : null;
+                            const prevAKey = prevMatches[j * 2]?.id || prevMatches[j * 2]?._id || `r${rounds[ri-1]}j${j*2}`;
+                            const prevA = positions[prevAKey];
+                            const prevBKey = prevMatches[j * 2 + 1]?.id || prevMatches[j * 2 + 1]?._id || `r${rounds[ri-1]}j${j*2+1}`;
+                            const prevB = prevMatches[j * 2 + 1] ? positions[prevBKey] : null;
                             const curr = positions[currMatches[j]?.id || currMatches[j]?._id || `r${rounds[ri]}j${j}`];
-                            if (!curr) continue;
+                            if (!curr || !prevA) continue;
                             const cx = prevA.x + CARD_W + (curr.x - prevA.x - CARD_W) / 2;
                             connectors.push({ x1: prevA.x + CARD_W, y1: prevA.y + CARD_H / 2, x2: cx, y2: prevA.y + CARD_H / 2 });
                             if (prevB) {
@@ -432,7 +507,7 @@ export default function BracketModeration(): React.ReactElement {
                             </svg>
                             {rounds.map((round, ri) => (
                               <div key={round} style={{ position: "absolute", top: 0, left: ri * (CARD_W + ROUND_GAP), width: CARD_W, color: "#888", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "center", fontWeight: 700, height: ROUND_LABEL_H, lineHeight: `${ROUND_LABEL_H}px` }}>
-                                {round === 1 ? "Premier tour" : round === 2 ? "Demi-finales" : round === 3 ? "Finale" : `Round ${round}`}
+                                {rounds.length === 1 ? "Finale" : round === 1 ? "Premier tour" : round === rounds[rounds.length - 1] ? "Finale" : round === 2 ? "Demi-finales" : `Round ${round}`}
                               </div>
                             ))}
                             {catMatches.map((m: any) => {
@@ -580,7 +655,7 @@ export default function BracketModeration(): React.ReactElement {
                     <th style={styles.th}>Genre</th>
                     <th style={styles.th}>Grade</th>
                     <th style={styles.th}>Poids (kg)</th>
-                    <th style={styles.th}>Action</th>
+                    <th style={{ ...styles.th, textAlign: "center" }}>🏆 Champion</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -602,27 +677,41 @@ export default function BracketModeration(): React.ReactElement {
                           {a.person?.athleteDetails?.grade || "—"}
                         </td>
                         <td style={styles.td}>
-                          <input
-                            type="number"
-                            step="0.1"
-                            min="20"
-                            max="200"
-                            value={w}
-                            disabled={data?.isClosed}
-                            onChange={(e) =>
-                              handleWeightChange(sid, e.target.value)
-                            }
-                            style={styles.input}
-                          />
+                          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="20"
+                              max="200"
+                              value={w}
+                              disabled={data?.isClosed}
+                              onChange={(e) =>
+                                handleWeightChange(sid, e.target.value)
+                              }
+                              style={styles.input}
+                            />
+                            <button
+                              style={styles.btn}
+                              disabled={data?.isClosed}
+                              onClick={() => updateWeight(sid)}
+                            >
+                              ✓
+                            </button>
+                          </div>
                         </td>
-                        <td style={styles.td}>
-                          <button
-                            style={styles.btn}
+                        <td style={{ ...styles.td, textAlign: "center" }}>
+                          <input
+                            type="checkbox"
+                            checked={champions[sid] !== undefined ? champions[sid] : !!a.isFormerChampion}
                             disabled={data?.isClosed}
-                            onClick={() => updateWeight(sid)}
-                          >
-                            ✓
-                          </button>
+                            onChange={() => toggleChampion(sid, champions[sid] !== undefined ? champions[sid] : !!a.isFormerChampion)}
+                            style={{
+                              width: 20,
+                              height: 20,
+                              cursor: data?.isClosed ? "not-allowed" : "pointer",
+                              accentColor: "#e4c328",
+                            }}
+                          />
                         </td>
                       </tr>
                     );
@@ -631,6 +720,81 @@ export default function BracketModeration(): React.ReactElement {
               </table>
             </div>
           ))}
+        </div>
+
+        {/* Teams Section */}
+        <div style={styles.card}>
+          <h3 style={{ margin: "0 0 16px", fontSize: "1rem", color: "#3b82f6" }}>👥 Équipes</h3>
+          <p className="muted" style={{ marginBottom: 16, fontSize: "0.85rem" }}>
+            Les membres d'une même équipe ne s'affronteront pas au premier tour.
+          </p>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <input
+              type="text"
+              placeholder="Nom de l'équipe..."
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && createTeam()}
+              disabled={data?.isClosed}
+              style={{ ...styles.input, flex: 1 }}
+            />
+            <button style={{ ...styles.btn, background: "#3b82f6", whiteSpace: "nowrap" }} onClick={createTeam} disabled={data?.isClosed || !newTeamName.trim()}>
+              + Créer
+            </button>
+          </div>
+          {teams.length === 0 ? (
+            <p style={{ color: "#888", fontSize: "0.85rem", margin: 0 }}>Aucune équipe créée.</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+              {teams.map((team: any) => {
+                const members = team.members || [];
+                const memberIds = new Set(members.map((m: any) => m.personId));
+                const availableAthletes = signups.filter((s: any) => !memberIds.has(s.personId || s.person?.id));
+                return (
+                  <div key={team.id} style={{ background: "#1a1a2e", borderRadius: 10, padding: 14, border: "1px solid #333" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <strong style={{ color: "#fff", fontSize: "0.9rem" }}>{team.name}</strong>
+                      <button style={{ ...styles.btn, background: "#d51332", padding: "2px 8px", fontSize: "0.7rem" }} onClick={() => deleteTeam(team.id)} disabled={data?.isClosed}>
+                        ✕
+                      </button>
+                    </div>
+                    {members.map((m: any) => (
+                      <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", fontSize: "0.85rem", color: "#ccc" }}>
+                        <span>• {m.person?.firstName} {m.person?.lastName}</span>
+                        <button style={{ ...styles.btn, background: "transparent", color: "#888", padding: "0 4px", fontSize: "0.75rem" }}
+                          onClick={() => removeTeamMember(team.id, m.personId)} disabled={data?.isClosed}>
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <div style={{ marginTop: 8 }}>
+                      {addMemberTeamId === team.id ? (
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) { addTeamMember(team.id, e.target.value); setAddMemberTeamId(null); }
+                          }}
+                          style={{ ...styles.input, width: "100%", fontSize: "0.8rem" }}
+                        >
+                          <option value="">— Choisir un athlète —</option>
+                          {availableAthletes.map((s: any) => (
+                            <option key={s.id || s._id} value={s.personId || s.person?.id}>
+                              {s.person?.firstName} {s.person?.lastName}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <button style={{ ...styles.btn, background: "transparent", color: "#3b82f6", padding: "4px 8px", fontSize: "0.8rem", border: "1px dashed #3b82f6" }}
+                          onClick={() => setAddMemberTeamId(team.id)} disabled={data?.isClosed || availableAthletes.length === 0}>
+                          + Ajouter un membre
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Tournament Bracket Graph */}
@@ -685,9 +849,18 @@ export default function BracketModeration(): React.ReactElement {
                     const prevMatches = byRound[rounds[ri - 1]].sort((a, b) => (a.bracketPosition || 1) - (b.bracketPosition || 1));
                     for (let j = 0; j < matches.length; j++) {
                       const prevIdx = j * 2;
-                      const prevA = positions[prevMatches[prevIdx]?.id || prevMatches[prevIdx]?._id || `r${rounds[ri-1]}j${prevIdx}`];
-                      const prevB = prevMatches[prevIdx + 1] ? positions[prevMatches[prevIdx + 1]?.id || prevMatches[prevIdx + 1]?._id || `r${rounds[ri-1]}j${prevIdx + 1}`] : null;
-                      const yCenter = prevB ? (prevA.y + prevA.h / 2 + prevB.y + prevB.h / 2) / 2 : prevA.y + prevA.h / 2;
+                      const prevAKey = prevMatches[prevIdx]?.id || prevMatches[prevIdx]?._id || `r${rounds[ri-1]}j${prevIdx}`;
+                      const prevA = positions[prevAKey];
+                      const prevBKey = prevMatches[prevIdx + 1]?.id || prevMatches[prevIdx + 1]?._id || `r${rounds[ri-1]}j${prevIdx + 1}`;
+                      const prevB = prevMatches[prevIdx + 1] ? positions[prevBKey] : null;
+                      let yCenter: number;
+                      if (!prevA) {
+                        yCenter = totalH + CARD_H / 2 + 40;
+                      } else if (prevB) {
+                        yCenter = (prevA.y + prevA.h / 2 + prevB.y + prevB.h / 2) / 2;
+                      } else {
+                        yCenter = prevA.y + prevA.h / 2;
+                      }
                       const y = yCenter - CARD_H / 2;
                       positions[matches[j].id || matches[j]._id || `r${round}j${j}`] = { x, y, w: CARD_W, h: CARD_H };
                     }
@@ -701,23 +874,21 @@ export default function BracketModeration(): React.ReactElement {
                   const currMatches = byRound[rounds[ri]].sort((a, b) => (a.bracketPosition || 1) - (b.bracketPosition || 1));
                   for (let j = 0; j < currMatches.length; j++) {
                     const prevIdx = j * 2;
-                    const prevA = positions[prevMatches[prevIdx]?.id || prevMatches[prevIdx]?._id || `r${rounds[ri-1]}j${prevIdx}`];
-                    const prevB = prevMatches[prevIdx + 1] ? positions[prevMatches[prevIdx + 1]?.id || prevMatches[prevIdx + 1]?._id || `r${rounds[ri-1]}j${prevIdx + 1}`] : null;
+                    const prevAKey = prevMatches[prevIdx]?.id || prevMatches[prevIdx]?._id || `r${rounds[ri-1]}j${prevIdx}`;
+                    const prevA = positions[prevAKey];
+                    const prevBKey = prevMatches[prevIdx + 1]?.id || prevMatches[prevIdx + 1]?._id || `r${rounds[ri-1]}j${prevIdx + 1}`;
+                    const prevB = prevMatches[prevIdx + 1] ? positions[prevBKey] : null;
                     const curr = positions[currMatches[j]?.id || currMatches[j]?._id || `r${rounds[ri]}j${j}`];
-                    if (!curr) continue;
+                    if (!curr || !prevA) continue;
 
                     const cx = prevA.x + prevA.w + (curr.x - prevA.x - prevA.w) / 2;
-
-                    // Line from prevA right edge to connector column
                     connectors.push({ x1: prevA.x + prevA.w, y1: prevA.y + prevA.h / 2, x2: cx, y2: prevA.y + prevA.h / 2, cx });
                     if (prevB) {
                       connectors.push({ x1: prevB.x + prevB.w, y1: prevB.y + prevB.h / 2, x2: cx, y2: prevB.y + prevB.h / 2, cx });
                     }
-                    // Vertical merge line (only if there are two feeders)
                     if (prevB) {
                       connectors.push({ x1: cx, y1: prevA.y + prevA.h / 2, x2: cx, y2: prevB.y + prevB.h / 2, cx: 0 });
                     }
-                    // Line from connector column to curr left edge
                     connectors.push({ x1: cx, y1: curr.y + curr.h / 2, x2: curr.x, y2: curr.y + curr.h / 2, cx: 0 });
                   }
                 }
@@ -749,7 +920,7 @@ export default function BracketModeration(): React.ReactElement {
                             color: "#888", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.1em",
                             textAlign: "center", fontWeight: 700, height: ROUND_LABEL_H, lineHeight: `${ROUND_LABEL_H}px`,
                           }}>
-                            {round === 1 ? "Premier tour" : round === 2 ? "Demi-finales" : round === 3 ? "Finale" : `Round ${round}`}
+                            {rounds.length === 1 ? "Finale" : round === 1 ? "Premier tour" : round === rounds[rounds.length - 1] ? "Finale" : round === 2 ? "Demi-finales" : `Round ${round}`}
                           </div>
                         ))}
 

@@ -71,6 +71,14 @@ export class PersonsController {
     res.send(csv);
   }
 
+  @Get("by-display/:displayId")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Trouver une personne par son displayId court" })
+  async findByDisplayId(@Param("displayId") displayId: string) {
+    return this.personsService.findByDisplayId(displayId);
+  }
+
   @Get(":id")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)

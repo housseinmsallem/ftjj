@@ -10,6 +10,26 @@ datasource db {
 enum Role {
   ADMIN
   CLUB_OWNER
+  REFEREE
+}
+
+enum LicenseType {
+  A
+  B
+}
+
+model Season {
+  id                   String   @id @default(uuid())
+  name                 String   @unique
+  isCurrent            Boolean  @default(false)
+  startsAt             DateTime
+  endsAt               DateTime
+  registrationClosesAt DateTime?
+  createdAt            DateTime @default(now())
+
+  licenses  License[]
+
+  @@map("seasons")
 }
 
 enum PersonType {
@@ -67,6 +87,7 @@ enum AgeDivision {
 model User {
   id         String   @id @default(uuid())
   email      String   @unique
+  username   String?  @unique
   password   String
   role       Role     @default(CLUB_OWNER)
   isApproved Boolean  @default(false)
@@ -74,6 +95,7 @@ model User {
   updatedAt  DateTime @updatedAt
 
   club          Club?          @relation("ClubOwner")
+  referee       Referee?
   refreshTokens RefreshToken[]
 
   @@map("users")
@@ -122,8 +144,11 @@ model ClubDocument {
 model Person {
   id                   String               @id @default(uuid())
   code                 String?              @unique
+  displayId            String?              @unique
   firstName            String
   lastName             String
+  arabicFirstName      String?
+  arabicLastName       String?
   dateOfBirth          DateTime
   nationality          String               @default("Tunisienne")
   gender               Gender
@@ -133,6 +158,7 @@ model Person {
   identityDocumentUrl  String?
   birthCertificateUrl  String?
   paymentReceiptUrl   String?
+  transferAuthorizationUrl String?
   type                 PersonType
   clubId               String?
   club                 Club?                @relation(fields: [clubId], references: [id])
@@ -150,6 +176,7 @@ model Person {
   matchesRed           Match[]               @relation("RedCorner")
   matchesBlue          Match[]               @relation("BlueCorner")
   registrationRequests RegistrationRequest[]
+  teamMembers          TeamMember[]
 
   @@map("persons")
 }
@@ -180,6 +207,8 @@ model Referee {
   personId                    String  @unique
   person                      Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
   refereeDegreeAttestationUrl String?
+  userId                      String? @unique
+  user                        User?   @relation(fields: [userId], references: [id])
 
   @@map("referees")
 }
@@ -194,18 +223,22 @@ model Technician {
 }
 
 model License {
-  id                String   @id @default(uuid())
-  personId          String
-  person            Person   @relation(fields: [personId], references: [id])
-  pricingId         String
-  pricing           Pricing  @relation(fields: [pricingId], references: [id])
-  issuedAt          DateTime @default(now())
-  expiryDate        DateTime
-  isActive          Boolean  @default(true)
-  paymentReceiptUrl String?
-  validatedByAdmin  Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                    String      @id @default(uuid())
+  personId              String
+  person                Person      @relation(fields: [personId], references: [id])
+  pricingId             String
+  pricing               Pricing     @relation(fields: [pricingId], references: [id])
+  seasonId              String?
+  season                Season?     @relation(fields: [seasonId], references: [id])
+  licenseType           LicenseType @default(A)
+  medicalCertificateUrl String?
+  issuedAt              DateTime    @default(now())
+  expiryDate            DateTime
+  isActive              Boolean     @default(true)
+  paymentReceiptUrl     String?
+  validatedByAdmin      Boolean     @default(false)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
 
   registrationRequest RegistrationRequest?
 
@@ -262,6 +295,7 @@ model Competition {
   signups     CompetitionSignup[]
   matches   Match[]
   mats         Mat[]
+  teams        Team[]
 
   @@map("competitions")
 }
@@ -297,12 +331,36 @@ model CompetitionSignup {
   person            Person             @relation(fields: [personId], references: [id])
   type              PersonType
   weight            Float?
+  isFormerChampion  Boolean            @default(false)
   paymentReceiptUrl String?
   status            RegistrationStatus @default(PENDING)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
   @@map("competition_signups")
+}
+
+model Team {
+  id            String      @id @default(uuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  name          String
+  createdAt     DateTime    @default(now())
+
+  members       TeamMember[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id       String @id @default(uuid())
+  teamId   String
+  team     Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  personId String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, personId])
+  @@map("team_members")
 }
 
 model Match {

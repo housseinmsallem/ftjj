@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import PageHeader from "../../components/shared/PageHeader";
 import FileUpload from "../../components/shared/FileUpload";
 import LoadingSpinner from "../../components/shared/LoadingSpinner";
+import EmptyState from "../../components/shared/EmptyState";
 import { COUNTRIES, getGradesForRole } from "../../utils/formOptions";
 import type { Pricing } from "../../types";
 
@@ -35,7 +36,6 @@ interface BatchPerson {
   gender: string;
   identityDocumentType: string;
   grade: string;
-  weight: string;
   identityDocumentUrl: string;
   birthCertificateUrl: string;
   photoUrl: string;
@@ -50,7 +50,6 @@ const emptyBatch: BatchPerson = {
   gender: "MALE",
   identityDocumentType: "CIN",
   grade: "",
-  weight: "",
   identityDocumentUrl: "",
   birthCertificateUrl: "",
   photoUrl: "",
@@ -76,8 +75,9 @@ const selectStyle: React.CSSProperties = {
 export default function ClubAthleteImport(): React.ReactElement {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<"csv" | "batch">("csv");
+  const [tab, setTab] = useState<"csv" | "batch" | "licenses">("csv");
 
+  // CSV state
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
   const [csvErrors, setCsvErrors] = useState<CsvError[]>([]);
@@ -86,19 +86,25 @@ export default function ClubAthleteImport(): React.ReactElement {
     failures: { row: number; message: string }[];
   } | null>(null);
 
+  // Batch state
   const [batchRows, setBatchRows] = useState<BatchPerson[]>([
     { ...emptyBatch },
   ]);
-  const [commonPaymentUrls, setCommonPaymentUrls] = useState<string[]>([]);
-  const [commonPricingId, setCommonPricingId] = useState<string>("");
   const [batchResult, setBatchResult] = useState<{
     success: number;
     errors: string[];
   } | null>(null);
 
+  // Licenses state
+  const [licenseSearch, setLicenseSearch] = useState("");
+  const [selectedPersonIds, setSelectedPersonIds] = useState<string[]>([]);
+  const [licensePricingId, setLicensePricingId] = useState<string>("");
+  const [licensePaymentUrls, setLicensePaymentUrls] = useState<string[]>([]);
+
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { data: pricingsData } = useQuery({
+  // Fetch pricing options (for licenses tab)
+  const { data: pricingsData, isLoading: pricingLoading } = useQuery({
     queryKey: ["pricing"],
     queryFn: async () => {
       const res = await api.get("/pricing");
@@ -107,21 +113,19 @@ export default function ClubAthleteImport(): React.ReactElement {
   });
   const pricings = pricingsData || [];
 
-  // Total calculation
-  const batchTotal = pricings.find((p) => (p._id || p.id) === commonPricingId);
-  const athleteLicenseTotal =
-    commonPricingId === "__athlete_license__"
-      ? batchRows.reduce(
-          (sum, row) => sum + (row.gender === "FEMALE" ? 5 : 15),
-          0,
-        )
-      : 0;
-  const displayTotal =
-    commonPricingId === "__athlete_license__"
-      ? athleteLicenseTotal
-      : batchTotal
-        ? Number(batchTotal.amount) * batchRows.length
-        : 0;
+  // Search persons for licenses tab
+  const { data: personsData, isLoading: personsSearchLoading } = useQuery({
+    queryKey: ["persons", "search", licenseSearch],
+    queryFn: async () => {
+      if (!licenseSearch || licenseSearch.trim().length < 2) return [];
+      const res = await api.get("/persons", {
+        params: { search: licenseSearch.trim() },
+      });
+      return ((res.data as any)?.data ?? res.data) as any[];
+    },
+    enabled: licenseSearch.trim().length >= 2,
+  });
+  const searchedPersons = personsData || [];
 
   // Inline upload for batch rows
   async function uploadBatchDoc(
@@ -143,10 +147,10 @@ export default function ClubAthleteImport(): React.ReactElement {
     }
   }
 
-  // Fill batch from CSV
-  function fillBatchFromCsv() {
+  // Transfer CSV rows to batch tab for review
+  function submitCsvPersons() {
     if (csvRows.length === 0) return;
-    const mapped: any[] = csvRows.map((r) => ({
+    const mapped: BatchPerson[] = csvRows.map((r) => ({
       firstName: r.firstName,
       lastName: r.lastName,
       dateOfBirth: r.dateOfBirth,
@@ -154,29 +158,34 @@ export default function ClubAthleteImport(): React.ReactElement {
       gender: r.gender || "MALE",
       identityDocumentType: r.identityDocumentType || "CIN",
       grade: r.grade || "",
-      weight: "",
       identityDocumentUrl: "",
       birthCertificateUrl: "",
       photoUrl: "",
-      achievements: "",
+      achievements: r.achievements || "",
     }));
     setBatchRows(mapped);
     setTab("batch");
     toast.success(
-      `${mapped.length} athlète${mapped.length > 1 ? "s" : ""} chargé${mapped.length > 1 ? "s" : ""} dans le lot.`,
+      `${mapped.length} athlète${mapped.length > 1 ? "s" : ""} transféré${mapped.length > 1 ? "s" : ""} vers la création manuelle.`,
     );
   }
 
   // Batch Mutation
   const batchMutation = useMutation({
-    mutationFn: (payload: {
-      persons: BatchPerson[];
-      commonPaymentReceiptUrl: string;
-      commonPricingId: string;
-    }) => api.post("/persons/batch", payload),
+    mutationFn: (payload: { persons: any[] }) =>
+      api.post("/persons/batch", payload),
     onSuccess: (res: any) => {
       const data = res.data?.data ?? res.data;
       setBatchResult(data);
+      // Also set csvResult when submitting from CSV tab
+      if (tab === "csv") {
+        setCsvResult({
+          success: data?.success ?? 0,
+          failures: (data?.errors || []).map(
+            (e: string, i: number) => ({ row: i + 1, message: e }),
+          ),
+        });
+      }
       toast.success(`${data?.success ?? 0} athlètes créés`);
       queryClient.invalidateQueries({ queryKey: ["persons"] });
     },
@@ -201,18 +210,20 @@ export default function ClubAthleteImport(): React.ReactElement {
         const errors: CsvError[] = [];
         raw.forEach((r, i) => {
           const rowErrors: string[] = [];
-          const firstName = r.firstName || r.first_name || r["prénom"] || "";
-          const lastName = r.lastName || r.last_name || r["nom"] || "";
-          if (!firstName.trim()) rowErrors.push("Prénom requis");
-          if (!lastName.trim()) rowErrors.push("Nom requis");
+          const firstName = (r["Prenom"] || r["prenom"] || r["prénom"] || r.firstName || r.first_name || "").trim();
+          const lastName = (r["Nom"] || r["nom"] || r.lastName || r.last_name || "").trim();
+          if (!firstName) rowErrors.push("Prénom requis");
+          if (!lastName) rowErrors.push("Nom requis");
           const dateOfBirth =
-            r.dateOfBirth || r.date_of_birth || r["date naissance"] || "";
+            r["Date naissance"] || r["date de naissance"] || r["date_naissance"] || r.dateOfBirth || r.date_of_birth || "";
           if (!dateOfBirth) rowErrors.push("Date de naissance requise");
-          const genderRaw = (r.gender || r["genre"] || "").toUpperCase();
-          const gender = ["MALE", "FEMALE"].includes(genderRaw)
-            ? genderRaw
-            : "";
-          if (!gender) rowErrors.push("Genre invalide");
+          // Gender: map G/GARCON/HOMME → MALE, F/FILLE/FEMME → FEMALE
+          const genderRaw = (r["Genre"] || r["genre"] || r["Sexe"] || r["sexe"] || r.gender || "").trim().toUpperCase();
+          let gender = genderRaw;
+          if (genderRaw === "G" || genderRaw === "GARCON" || genderRaw === "HOMME") gender = "MALE";
+          else if (genderRaw === "F" || genderRaw === "FILLE" || genderRaw === "FEMME") gender = "FEMALE";
+          else if (!["MALE", "FEMALE"].includes(genderRaw)) gender = "";
+          if (!gender) rowErrors.push("Genre invalide (utilisez Homme/Femme ou G/F)");
           if (rowErrors.length) {
             errors.push({ row: i + 2, errors: rowErrors });
           }
@@ -220,12 +231,12 @@ export default function ClubAthleteImport(): React.ReactElement {
             firstName: firstName.trim(),
             lastName: lastName.trim(),
             dateOfBirth,
-            nationality: r.nationality || r["nationalité"] || "Tunisienne",
+            nationality: (r["Nationalite"] || r["nationalite"] || r["nationalité"] || r.nationality || "Tunisienne").trim(),
             gender,
             identityDocumentType:
-              r.identityDocumentType || r["type document"] || "CIN",
-            grade: r.grade || r["ceinture"] || "",
-            club: r.club || r["club"] || "",
+              r["Type document"] || r["type_document"] || r["type document"] || r.identityDocumentType || "CIN",
+            grade: (r["Grade"] || r["grade"] || r["ceinture"] || "").trim(),
+            club: (r["Club"] || r["club"] || "").trim(),
             achievements: (r["Palmarès"] || r["palmares"] || r["achievements"] || "").trim(),
           });
         });
@@ -267,8 +278,6 @@ export default function ClubAthleteImport(): React.ReactElement {
         errors.push(`Ligne ${i + 1} : Date de naissance requise`);
       if (!row.gender) errors.push(`Ligne ${i + 1} : Genre requis`);
     });
-    if (commonPaymentUrls.length === 0) errors.push("Au moins un reçu de paiement est requis");
-    if (!commonPricingId) errors.push("Le type de licence est requis");
     return errors;
   }
 
@@ -279,32 +288,26 @@ export default function ClubAthleteImport(): React.ReactElement {
       return;
     }
     const persons = batchRows.map((row) => {
-      const pricingId =
-        commonPricingId === "__athlete_license__"
-          ? row.gender === "FEMALE"
-            ? pricings.find((p) => p.name === "License Athlete 5dt (Female)")
-                ?._id ||
-              pricings.find((p) => p.name === "License Athlete 5dt (Female)")
-                ?.id
-            : pricings.find((p) => p.name === "License Athlete 15dt (Male)")
-                ?._id ||
-              pricings.find((p) => p.name === "License Athlete 15dt (Male)")?.id
-          : undefined;
-      return {
-        ...row,
-        weight: row.weight ? Number(row.weight) : undefined,
-        identityDocumentUrl: row.identityDocumentUrl || undefined,
-        birthCertificateUrl: row.birthCertificateUrl || undefined,
-        photoUrl: row.photoUrl || undefined,
-        achievements: row.achievements ? row.achievements.split("|").map(s => s.trim()).filter(Boolean) : undefined,
+      const person: any = {
+        firstName: row.firstName.trim(),
+        lastName: row.lastName.trim(),
+        dateOfBirth: row.dateOfBirth,
+        nationality: row.nationality || undefined,
+        gender: row.gender || "MALE",
+        type: "ATHLETE",
+        identityDocumentType: row.identityDocumentType || "CIN",
+        grade: row.grade || undefined,
       };
+      if (row.identityDocumentUrl) person.identityDocumentUrl = row.identityDocumentUrl;
+      if (row.birthCertificateUrl) person.birthCertificateUrl = row.birthCertificateUrl;
+      if (row.photoUrl) person.photoUrl = row.photoUrl;
+      if (row.achievements) {
+        const parsed = row.achievements.split("|").map((s: string) => s.trim()).filter(Boolean);
+        if (parsed.length > 0) person.achievements = parsed;
+      }
+      return person;
     });
-    batchMutation.mutate({
-      persons: persons as any,
-      commonPaymentReceiptUrl: commonPaymentUrls.join("|"),
-      commonPricingId:
-        commonPricingId === "__athlete_license__" ? "" : commonPricingId,
-    });
+    batchMutation.mutate({ persons });
   }
 
   return (
@@ -354,18 +357,48 @@ export default function ClubAthleteImport(): React.ReactElement {
           }}
           onClick={() => setTab("batch")}
         >
-          ✍️ Création par lot
+          ✍️ Création manuelle
+        </button>
+        <button
+          style={{
+            padding: "10px 24px",
+            cursor: "pointer",
+            borderBottom:
+              tab === "licenses"
+                ? "2px solid var(--red)"
+                : "2px solid transparent",
+            fontWeight: tab === "licenses" ? 700 : 500,
+            color: tab === "licenses" ? "var(--red)" : "var(--text)",
+            background: "transparent",
+            border: "none",
+            fontSize: "0.95rem",
+          }}
+          onClick={() => setTab("licenses")}
+        >
+          🎫 Demandes de licence
         </button>
       </div>
 
+      {/* ─────────── TAB CSV ─────────── */}
       {tab === "csv" && (
         <div className="card" style={{ padding: 24 }}>
           <h3 style={{ marginTop: 0 }}>Importation CSV</h3>
           <p className="muted" style={{ marginBottom: 16 }}>
             Téléchargez un fichier CSV contenant les athlètes à importer. Les
-            colonnes attendues : firstName, lastName, dateOfBirth, nationality,
-            gender, identityDocumentType.
+            colonnes attendues : Prenom, Nom, Date naissance, Genre, Nationalite,
+            Type document, Grade, Club, Palmarès.
           </p>
+
+          <div style={{ marginBottom: 16 }}>
+            <a
+              href="/template-import-athletes.csv"
+              download
+              className="btn ghost"
+              style={{ textDecoration: "none", fontSize: "0.9rem" }}
+            >
+              📥 Télécharger le modèle CSV
+            </a>
+          </div>
           <input
             type="file"
             accept=".csv"
@@ -419,9 +452,9 @@ export default function ClubAthleteImport(): React.ReactElement {
                   ))}
                 </div>
               )}
-              <button className="btn primary" onClick={fillBatchFromCsv}>
-                Remplir le lot ({csvRows.length} personne
-                {csvRows.length > 1 ? "s" : ""})
+              <button className="btn primary" onClick={submitCsvPersons}>
+                Transférer {csvRows.length} personne
+                {csvRows.length > 1 ? "s" : ""} vers la création manuelle
               </button>
             </>
           )}
@@ -466,9 +499,10 @@ export default function ClubAthleteImport(): React.ReactElement {
         </div>
       )}
 
+      {/* ─────────── TAB BATCH ─────────── */}
       {tab === "batch" && (
         <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ marginTop: 0 }}>Création par lot</h3>
+          <h3 style={{ marginTop: 0 }}>Création manuelle</h3>
           <p className="muted" style={{ marginBottom: 16 }}>
             Ajoutez jusqu'à 100 athlètes manuellement. Les champs avec{" "}
             <span style={{ color: "var(--red)" }}>*</span> sont obligatoires.
@@ -484,7 +518,6 @@ export default function ClubAthleteImport(): React.ReactElement {
                   <th>Date naissance *</th>
                   <th>Nationalité</th>
                   <th>Genre *</th>
-                  <th>Poids (kg)</th>
                   <th>Type doc.</th>
                   <th>Fichier ID</th>
                   <th>Photo</th>
@@ -555,20 +588,6 @@ export default function ClubAthleteImport(): React.ReactElement {
                         <option value="MALE">Homme</option>
                         <option value="FEMALE">Femme</option>
                       </select>
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="20"
-                        max="200"
-                        value={row.weight}
-                        onChange={(e) =>
-                          updateBatchRow(idx, "weight", e.target.value)
-                        }
-                        placeholder="73"
-                        style={{ ...inputStyle, width: 70 }}
-                      />
                     </td>
                     <td>
                       <select
@@ -714,7 +733,6 @@ export default function ClubAthleteImport(): React.ReactElement {
           <button
             type="button"
             className="btn"
-            style={{ marginBottom: 24 }}
             onClick={addBatchRow}
             disabled={batchRows.length >= 100}
           >
@@ -727,143 +745,7 @@ export default function ClubAthleteImport(): React.ReactElement {
             {batchRows.length} / 100 athlètes
           </span>
 
-          <div
-            style={{
-              borderTop: "1px solid var(--border)",
-              paddingTop: 20,
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-            }}
-          >
-            <h4 style={{ margin: 0 }}>Configuration du lot</h4>
-            <div
-              className="form-grid"
-              style={{ gridTemplateColumns: "1fr 1fr", gap: 16 }}
-            >
-              <div>
-                <label className="field-label">
-                  Type de licence <span style={{ color: "var(--red)" }}>*</span>
-                </label>
-                <select
-                  value={commonPricingId}
-                  onChange={(e) => setCommonPricingId(e.target.value)}
-                  style={{ ...selectStyle, width: "100%" }}
-                >
-                  <option value="">Sélectionner un type de licence</option>
-                  <option value="__athlete_license__">
-                    🥋 License Athlete — 15 DT (Homme) / 5 DT (Femme)
-                  </option>
-                  {pricings
-                    .filter((p) => p.category === "LICENSE")
-                    .map((p) => (
-                      <option key={p._id || p.id} value={p._id || p.id}>
-                        {p.name} — {p.amount} DT
-                      </option>
-                    ))}
-                </select>
-                {commonPricingId && batchRows.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: 12,
-                      padding: "12px 16px",
-                      background: "var(--panel)",
-                      borderRadius: 12,
-                      border: "1px solid var(--border)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <span
-                        style={{ color: "var(--muted)", fontSize: "0.9rem" }}
-                      >
-                        {batchRows.length} athlète
-                        {batchRows.length > 1 ? "s" : ""}
-                        {commonPricingId === "__athlete_license__" && (
-                          <span style={{ marginLeft: 8, fontSize: "0.8rem" }}>
-                            (
-                            {
-                              batchRows.filter((r) => r.gender === "MALE")
-                                .length
-                            }{" "}
-                            ♂,{" "}
-                            {
-                              batchRows.filter((r) => r.gender === "FEMALE")
-                                .length
-                            }{" "}
-                            ♀)
-                          </span>
-                        )}
-                      </span>
-                      <strong
-                        style={{ color: "var(--gold)", fontSize: "1.1rem" }}
-                      >
-                        Total : {displayTotal} DT
-                      </strong>
-                    </div>
-                    {commonPricingId === "__athlete_license__" && (
-                      <div
-                        style={{
-                          marginTop: 6,
-                          fontSize: "0.8rem",
-                          color: "var(--muted)",
-                        }}
-                      >
-                        ♂ {batchRows.filter((r) => r.gender === "MALE").length}{" "}
-                        × 15 DT + ♀{" "}
-                        {batchRows.filter((r) => r.gender === "FEMALE").length}{" "}
-                        × 5 DT
-                      </div>
-                    )}
-                    {commonPricingId !== "__athlete_license__" &&
-                      batchTotal && (
-                        <div
-                          style={{
-                            marginTop: 6,
-                            fontSize: "0.8rem",
-                            color: "var(--muted)",
-                          }}
-                        >
-                          {batchRows.length} × {Number(batchTotal.amount)} DT
-                        </div>
-                      )}
-                  </div>
-                )}
-              </div>
-              <div style={{ marginBottom: 16 }}>
-                <label className="field-label" style={{ marginBottom: 8 }}>Reçus de paiement</label>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {commonPaymentUrls.map((url, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "var(--bg)", borderRadius: 8, border: "1px solid var(--border)" }}>
-                      <span style={{ flex: 1, fontSize: "0.85rem", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        📎 Reçu {i + 1}
-                      </span>
-                      <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--green)", fontSize: "0.8rem" }}>Voir</a>
-                      <button className="btn danger" style={{ padding: "2px 8px", fontSize: "0.7rem" }}
-                        onClick={() => setCommonPaymentUrls(commonPaymentUrls.filter((_, j) => j !== i))}>
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ marginTop: 8 }}>
-                  <FileUpload
-                    label="Ajouter un reçu de paiement"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    maxSizeMB={10}
-                    currentUrl={null}
-                    onUploaded={(url) => setCommonPaymentUrls([...commonPaymentUrls, url])}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
+          {/* Submit button right after add button */}
           <div style={{ marginTop: 20 }}>
             <button
               className="btn primary"
@@ -872,7 +754,7 @@ export default function ClubAthleteImport(): React.ReactElement {
             >
               {batchMutation.isPending
                 ? "Enregistrement..."
-                : "Enregistrer le lot"}
+                : `Créer ${batchRows.length} athlète${batchRows.length > 1 ? "s" : ""}`}
             </button>
           </div>
 
@@ -919,6 +801,212 @@ export default function ClubAthleteImport(): React.ReactElement {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─────────── TAB LICENSES ─────────── */}
+      {tab === "licenses" && (
+        <div className="card" style={{ padding: 24 }}>
+          <h3 style={{ marginTop: 0 }}>Demandes de licence</h3>
+          <p className="muted" style={{ marginBottom: 16 }}>
+            Cette fonctionnalité sera disponible prochainement.
+          </p>
+
+          {/* Person search */}
+          <div style={{ marginBottom: 20 }}>
+            <label className="field-label" style={{ marginBottom: 8 }}>
+              Rechercher une personne
+            </label>
+            <input
+              type="text"
+              value={licenseSearch}
+              onChange={(e) => setLicenseSearch(e.target.value)}
+              placeholder="Tapez au moins 2 caractères..."
+              style={inputStyle}
+            />
+          </div>
+
+          {/* Search results */}
+          {licenseSearch.trim().length >= 2 && (
+            <div style={{ marginBottom: 20 }}>
+              {personsSearchLoading ? (
+                <LoadingSpinner text="Recherche en cours..." />
+              ) : searchedPersons.length === 0 ? (
+                <EmptyState title="Aucune personne trouvée" />
+              ) : (
+                <div
+                  className="table-wrap"
+                  style={{ maxHeight: 300, overflowY: "auto", marginBottom: 16 }}
+                >
+                  <table className="smart-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 40 }}>#</th>
+                        <th>Prénom</th>
+                        <th>Nom</th>
+                        <th>Date naissance</th>
+                        <th style={{ width: 40 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {searchedPersons.map((p: any) => {
+                        const pid = p._id || p.id;
+                        const checked = selectedPersonIds.includes(pid);
+                        return (
+                          <tr
+                            key={pid}
+                            style={{
+                              background: checked ? "var(--red-transparent)" : undefined,
+                              cursor: "pointer",
+                            }}
+                            onClick={() => {
+                              setSelectedPersonIds(
+                                checked
+                                  ? selectedPersonIds.filter((id) => id !== pid)
+                                  : [...selectedPersonIds, pid],
+                              );
+                            }}
+                          >
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                readOnly
+                                style={{ cursor: "pointer" }}
+                              />
+                            </td>
+                            <td>{p.firstName || "—"}</td>
+                            <td>{p.lastName || "—"}</td>
+                            <td>{p.dateOfBirth || "—"}</td>
+                            <td></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {selectedPersonIds.length > 0 && (
+                <p className="muted" style={{ fontSize: "0.85rem" }}>
+                  {selectedPersonIds.length} personne
+                  {selectedPersonIds.length > 1 ? "s" : ""} sélectionnée
+                  {selectedPersonIds.length > 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Pricing / license type */}
+          <div style={{ marginBottom: 20 }}>
+            <label className="field-label" style={{ marginBottom: 8 }}>
+              Type de licence
+            </label>
+            {pricingLoading ? (
+              <LoadingSpinner text="Chargement des tarifs..." />
+            ) : (
+              <select
+                value={licensePricingId}
+                onChange={(e) => setLicensePricingId(e.target.value)}
+                style={{ ...selectStyle, width: "100%" }}
+              >
+                <option value="">Sélectionner un type de licence</option>
+                <option value="__athlete_license__">
+                  🥋 License Athlete — 15 DT (Homme) / 5 DT (Femme)
+                </option>
+                {pricings
+                  .filter((p) => p.category === "LICENSE")
+                  .map((p) => (
+                    <option key={p._id || p.id} value={p._id || p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+              </select>
+            )}
+          </div>
+
+          {/* Payment receipt */}
+          <div style={{ marginBottom: 20 }}>
+            <label className="field-label" style={{ marginBottom: 8 }}>
+              Reçus de paiement
+            </label>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: 8 }}
+            >
+              {licensePaymentUrls.map((url, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "6px 10px",
+                    background: "var(--bg)",
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  <span
+                    style={{
+                      flex: 1,
+                      fontSize: "0.85rem",
+                      color: "var(--text)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    📎 Reçu {i + 1}
+                  </span>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--green)", fontSize: "0.8rem" }}
+                  >
+                    Voir
+                  </a>
+                  <button
+                    className="btn danger"
+                    style={{ padding: "2px 8px", fontSize: "0.7rem" }}
+                    onClick={() =>
+                      setLicensePaymentUrls(
+                        licensePaymentUrls.filter((_, j) => j !== i),
+                      )
+                    }
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <FileUpload
+                label="Ajouter un reçu de paiement"
+                accept=".pdf,.jpg,.jpeg,.png"
+                maxSizeMB={10}
+                currentUrl={null}
+                onUploaded={(url) =>
+                  setLicensePaymentUrls([...licensePaymentUrls, url])
+                }
+              />
+            </div>
+          </div>
+
+          {/* Submit */}
+          <div style={{ marginTop: 20 }}>
+            <button
+              className="btn primary"
+              disabled={
+                selectedPersonIds.length === 0 || !licensePricingId
+              }
+              onClick={() => {
+                toast.info("Fonctionnalité à venir");
+              }}
+            >
+              Attribuer les licences ({selectedPersonIds.length} personne
+              {selectedPersonIds.length > 1 ? "s" : ""})
+            </button>
+          </div>
         </div>
       )}
     </div>

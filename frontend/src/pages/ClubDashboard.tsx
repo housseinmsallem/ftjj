@@ -1,6 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "../services/api";
+import { useAuth } from "../context/AuthContext";
 import PageHeader from "../components/shared/PageHeader";
 import LoadingSpinner from "../components/shared/LoadingSpinner";
 import StatusBadge from "../components/shared/StatusBadge";
@@ -12,7 +13,6 @@ interface ClubData {
     total: number;
     athletes: number;
     coaches: number;
-    referees: number;
     technicians: number;
   };
   activeLicenses: number;
@@ -28,26 +28,30 @@ interface RegistrationItem {
 }
 
 export default function ClubDashboard(): React.ReactElement {
+  const { user, loading: authLoading } = useAuth();
+
   const { data, isLoading, isError } = useQuery<ClubData>({
-    queryKey: ["club-stats"],
+    queryKey: ["club-stats", user?.id],
     queryFn: async () => {
       const res = await api.get("/dashboard/club-stats");
       return res.data?.data ?? res.data;
     },
+    enabled: !authLoading && !!user,
   });
 
   const { data: registrations, isLoading: regLoading } = useQuery<
     RegistrationItem[]
   >({
-    queryKey: ["registrations"],
+    queryKey: ["registrations", user?.id],
     queryFn: async () => {
       const res = await api.get("/registrations");
       const arr = res.data?.data ?? res.data;
       return Array.isArray(arr) ? arr.slice(0, 5) : [];
     },
+    enabled: !authLoading && !!user,
   });
 
-  if (isLoading)
+  if (authLoading || isLoading)
     return <LoadingSpinner text="Chargement du tableau de bord..." />;
 
   if (isError || !data?.club) {
@@ -74,6 +78,12 @@ export default function ClubDashboard(): React.ReactElement {
     color: "var(--text)",
     lineHeight: 1.1,
   };
+
+  const club = data.club;
+  const owner = data.owner ?? { id: "", email: "—" };
+  const persons = data.persons ?? { total: 0, athletes: 0, coaches: 0, technicians: 0 };
+  const activeLicenses = data.activeLicenses ?? 0;
+  const pendingRequests = data.pendingRequests ?? 0;
 
   return (
     <div>
@@ -111,22 +121,22 @@ export default function ClubDashboard(): React.ReactElement {
             flexShrink: 0,
           }}
         >
-          {data.club.name.charAt(0).toUpperCase()}
+          {(club.name || "C").charAt(0).toUpperCase()}
         </div>
         <div style={{ flex: 1 }}>
           <h2 style={{ margin: 0, fontSize: "1.4rem", color: "white" }}>
-            {data.club.name}
+            {club.name || "Mon Club"}
           </h2>
-          {data.club.address && (
+          {club.address && (
             <p className="muted" style={{ margin: "4px 0 0", color: "white" }}>
-              {data.club.address}
+              {club.address}
             </p>
           )}
           <p
             className="muted"
             style={{ margin: "2px 0 0", fontSize: "0.85rem", color: "white" }}
           >
-            Propriétaire : {data.owner.email}
+            Propriétaire : {owner.email}
           </p>
         </div>
         <div
@@ -136,7 +146,7 @@ export default function ClubDashboard(): React.ReactElement {
             borderLeft: "1px solid var(--border)",
           }}
         >
-          <div style={bigNumber}>{data.persons.athletes}</div>
+          <div style={bigNumber}>{persons.athletes}</div>
           <div className="muted" style={{ fontSize: "0.8rem", color: "white" }}>
             Athlètes
           </div>
@@ -153,32 +163,15 @@ export default function ClubDashboard(): React.ReactElement {
         }}
       >
         {[
-          {
-            label: "Total personnes",
-            value: data.persons.total,
-            color: "#fff",
-          },
-          { label: "Athlètes", value: data.persons.athletes, color: "#22c55e" },
-          {
-            label: "Entraîneurs",
-            value: data.persons.coaches,
-            color: "#3b82f6",
-          },
-          { label: "Arbitres", value: data.persons.referees, color: "#e4c328" },
-          {
-            label: "Techniciens",
-            value: data.persons.technicians,
-            color: "#a855f7",
-          },
-          {
-            label: "Licences actives",
-            value: data.activeLicenses,
-            color: "#22c55e",
-          },
+          { label: "Total personnes", value: persons.total, color: "#fff" },
+          { label: "Athlètes", value: persons.athletes, color: "#22c55e" },
+          { label: "Entraîneurs", value: persons.coaches, color: "#3b82f6" },
+          { label: "Techniciens", value: persons.technicians, color: "#a855f7" },
+          { label: "Licences actives", value: activeLicenses, color: "#22c55e" },
           {
             label: "En attente",
-            value: data.pendingRequests,
-            color: data.pendingRequests > 0 ? "#d51332" : "#22c55e",
+            value: pendingRequests,
+            color: pendingRequests > 0 ? "#d51332" : "#22c55e",
           },
         ].map((stat) => (
           <div key={stat.label} style={{ ...cardBase, textAlign: "center" }}>

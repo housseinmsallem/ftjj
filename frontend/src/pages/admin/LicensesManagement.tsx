@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useDebounce } from "../../hooks/useDebounce";
 import api from "../../services/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -20,12 +21,14 @@ interface Club {
 interface LicenseFormData {
   personId: string;
   pricingId: string;
+  medicalCertificateUrl: string;
   paymentReceiptUrl: string;
 }
 
 const emptyForm: LicenseFormData = {
   personId: "",
   pricingId: "",
+  medicalCertificateUrl: "",
   paymentReceiptUrl: "",
 };
 
@@ -38,7 +41,8 @@ export default function LicensesManagement(): React.ReactElement {
   const [printLicense, setPrintLicense] = useState<License | null>(null);
 
   // Filters
-  const [searchText, setSearchText] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const searchText = useDebounce(searchInput, 300);
   const [activeOnly, setActiveOnly] = useState(false);
   const [filterClubId, setFilterClubId] = useState("");
 
@@ -179,6 +183,7 @@ export default function LicensesManagement(): React.ReactElement {
       await api.post("/licenses", {
         personId: form.personId,
         pricingId: form.pricingId,
+        medicalCertificateUrl: form.medicalCertificateUrl || undefined,
         paymentReceiptUrl: form.paymentReceiptUrl || undefined,
       });
       toast.success("Licence créée avec succès");
@@ -255,24 +260,13 @@ export default function LicensesManagement(): React.ReactElement {
       />
 
       {/* Filter bar */}
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-          flexWrap: "wrap",
-          marginBottom: 16,
-        }}
-      >
+      <div className="admin-search-bar">
         <input
           type="text"
+          className="admin-search-input"
           placeholder="Rechercher par nom de personne..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          style={{
-            ...inputStyle,
-            minWidth: 260,
-          }}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
         />
         <label
           style={{
@@ -467,28 +461,26 @@ export default function LicensesManagement(): React.ReactElement {
                     }}
                     style={inputStyle}
                   />
-                  {personSearch.trim() && (
-                    <select
-                      value={form.personId}
-                      onChange={(e) =>
-                        setForm({ ...form, personId: e.target.value })
-                      }
-                      size={Math.min(filteredPersons.length, 6)}
-                      style={{
-                        ...inputStyle,
-                        marginTop: 4,
-                        width: "100%",
-                        minHeight: 40,
-                      }}
-                    >
-                      <option value="">— Sélectionner —</option>
-                      {filteredPersons.map((p) => (
-                        <option key={p._id || p.id} value={p._id || p.id}>
-                          {p.firstName} {p.lastName}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                  <select
+                    value={form.personId}
+                    onChange={(e) =>
+                      setForm({ ...form, personId: e.target.value })
+                    }
+                    size={Math.min(Math.max(filteredPersons.length, 1), 6)}
+                    style={{
+                      ...inputStyle,
+                      marginTop: 4,
+                      width: "100%",
+                      minHeight: 40,
+                    }}
+                  >
+                    <option value="">— Sélectionner —</option>
+                    {filteredPersons.map((p) => (
+                      <option key={p._id || p.id} value={p._id || p.id}>
+                        {p.firstName} {p.lastName}
+                      </option>
+                    ))}
+                  </select>
                   {form.personId && (
                     <small
                       style={{
@@ -515,11 +507,23 @@ export default function LicensesManagement(): React.ReactElement {
                       .filter((pr) => pr.category === "LICENSE")
                       .map((pr) => (
                         <option key={pr._id || pr.id} value={pr._id || pr.id}>
-                          {pr.name} — {pr.amount} TND
+                          {pr.name}
                         </option>
                       ))}
                   </select>
                 </label>
+              </div>
+              <div style={{ marginTop: 18 }}>
+                <FileUpload
+                  label="Certificat médical"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  hint="Obligatoire pour les athlètes"
+                  maxSizeMB={5}
+                  onUploaded={(url) =>
+                    setForm({ ...form, medicalCertificateUrl: url })
+                  }
+                  currentUrl={form.medicalCertificateUrl || null}
+                />
               </div>
               <div style={{ marginTop: 18 }}>
                 <FileUpload

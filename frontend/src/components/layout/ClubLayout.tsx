@@ -11,7 +11,6 @@ const clubNavItems = [
   { to: "/club/details", label: "Mon club", icon: "🏛️" },
   { to: "/club/athletes", label: "Mes athlètes", icon: "🥋" },
   { to: "/club/coaches", label: "Mes entraîneurs", icon: "👨‍🏫" },
-  { to: "/club/referees", label: "Mes arbitres", icon: "⚖️" },
   { to: "/club/technicians", label: "Mes techniciens", icon: "🔧" },
   { to: "/club/competitions", label: "Compétitions", icon: "🏆" },
   { to: "/club/registrations", label: "Gestion des inscriptions", icon: "📝" },

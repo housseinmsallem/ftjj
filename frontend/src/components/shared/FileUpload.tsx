@@ -8,6 +8,7 @@ interface FileUploadProps {
   onUploaded: (url: string) => void;
   currentUrl?: string | null;
   light?: boolean;
+  hint?: string;
 }
 
 export default function FileUpload({
@@ -17,6 +18,7 @@ export default function FileUpload({
   onUploaded,
   currentUrl,
   light,
+  hint,
 }: FileUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -61,6 +63,19 @@ export default function FileUpload({
   return (
     <div className="file-upload-field">
       <label className="field-label" style={light ? { color: "rgba(255,255,255,0.85)" } : undefined}>{label}</label>
+      {hint && (
+        <small
+          style={{
+            display: "block",
+            marginTop: 2,
+            fontSize: "0.75rem",
+            color: light ? "rgba(255,255,255,0.5)" : "var(--muted, #64748b)",
+            fontStyle: "italic",
+          }}
+        >
+          {hint}
+        </small>
+      )}
       <div className="file-upload-area">
         <input
           ref={fileRef}

@@ -12,6 +12,7 @@ import {
 } from "./persons.dto";
 import { PersonType, Role } from "@prisma/client";
 import { getAgeDivision, getWeightCategory, getCurrentSeasonYear } from "../../common/utils/age-division";
+import { generateDisplayId } from "../../common/utils/display-id";
 
 @Injectable()
 export class PersonsService {
@@ -134,6 +135,8 @@ export class PersonsService {
 
     // Generate athlete code (ATHTJJF prefix + auto-increment)
     const code = await this.generatePersonCode();
+    // Generate short display ID
+    const displayId = await this.generateUniqueDisplayId();
 
     const {
       grade,
@@ -151,6 +154,7 @@ export class PersonsService {
       data: {
         ...personData,
         code,
+        displayId,
         clubId,
         dateOfBirth: new Date(personData.dateOfBirth),
         paymentReceiptUrl: paymentReceiptUrl || null,
@@ -193,6 +197,21 @@ export class PersonsService {
     });
 
     return { message: "Personne créée avec succès", data: person };
+  }
+
+  async findByDisplayId(displayId: string) {
+    const person = await this.prisma.person.findUnique({
+      where: { displayId },
+      include: {
+        athleteDetails: true,
+        coachDetails: true,
+        refereeDetails: true,
+        technicianDetails: true,
+        club: { select: { id: true, name: true } },
+      },
+    });
+    if (!person) throw new NotFoundException("Personne non trouvée");
+    return { data: person };
   }
 
   async update(
@@ -468,6 +487,20 @@ export class PersonsService {
       }
     }
     return `${PREFIX}${nextNum}`;
+  }
+
+  private async generateUniqueDisplayId(): Promise<string> {
+    // Generate a temporary UUID to derive a display ID from
+    const { v4: uuidv4 } = await import("uuid");
+    let displayId: string;
+    let attempt = 0;
+    do {
+      displayId = generateDisplayId(uuidv4(), attempt);
+      const existing = await this.prisma.person.findUnique({ where: { displayId }, select: { id: true } });
+      if (!existing) break;
+      attempt++;
+    } while (attempt < 10);
+    return displayId;
   }
 
   private isMinor(dateOfBirth: Date): boolean {

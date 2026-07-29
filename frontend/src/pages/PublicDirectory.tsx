@@ -392,7 +392,7 @@ export default function PublicDirectory({
                   <div className="directory-card-header">
                     <div className="entity-avatar">
                       {row.photoUrl ? (
-                        <img src={row.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                        <img src={row.photoUrl} alt={labelFor(row, type)} />
                       ) : (
                         labelFor(row, type).slice(0, 2).toUpperCase()
                       )}
@@ -448,7 +448,7 @@ export default function PublicDirectory({
               <div className="profile-head">
                 <div className="entity-avatar large">
                   {selected.photoUrl ? (
-                    <img src={selected.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                    <img src={selected.photoUrl} alt={labelFor(selected, type)} />
                   ) : (
                     labelFor(selected, type).slice(0, 2).toUpperCase()
                   )}

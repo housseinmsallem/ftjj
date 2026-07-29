@@ -18,6 +18,21 @@ export class CreatePersonDto {
   @IsString({ message: "Le nom de famille est obligatoire" })
   lastName: string;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  arabicFirstName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  arabicLastName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  transferAuthorizationUrl?: string;
+
   @ApiProperty({ example: "2000-05-15" })
   @IsDateString(
     {},
@@ -128,6 +143,21 @@ export class UpdatePersonDto {
   @IsOptional()
   @IsString()
   lastName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  arabicFirstName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  arabicLastName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  transferAuthorizationUrl?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

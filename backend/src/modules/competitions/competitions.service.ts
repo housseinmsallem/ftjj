@@ -197,6 +197,16 @@ export class CompetitionsService {
       throw new NotFoundException("Personne non trouvée");
     }
 
+    // Check license type for Championship competitions
+    if (competition.type === "Championship") {
+      const license = await this.prisma.license.findFirst({ where: { personId: data.personId, isActive: true } });
+      if (license && license.licenseType === "B") {
+        throw new BadRequestException(
+          "Les athlètes avec une licence de type B ne peuvent participer qu'aux compétitions Open. Veuillez fournir un document d'autorisation de transfert pour obtenir une licence de type A."
+        );
+      }
+    }
+
     // Validate age division for ATHLETE type
     if (data.type === PersonType.ATHLETE && person.athleteDetails) {
       const birthYear = person.dateOfBirth.getFullYear();
@@ -402,6 +412,100 @@ export class CompetitionsService {
     };
   }
 
+  /**
+   * Seeds athletes into first-round matches, avoiding conflicts by priority:
+   * 1. Champions never face each other
+   * 2. Same-team members never face each other
+   * 3. Same-club members never face each other
+   * Returns an array of matches: [{ red: id|null, blue: id|null }]
+   * A null corner means a bye (odd number of athletes).
+   */
+  private seedFirstRound(athletes: Array<{ id: string; weight: number; isFormerChampion: boolean; clubId?: string; teamIds: string[] }>): Array<{ red: string | null; blue: string | null }> {
+    const n = athletes.length;
+    if (n < 2) return [];
+
+    const numMatches = Math.floor(n / 2);
+    const hasBye = n % 2 === 1;
+
+    // Separate champions
+    const sorted = [...athletes].sort((a, b) => a.weight - b.weight);
+    const champions = sorted.filter(a => a.isFormerChampion);
+    const others = sorted.filter(a => !a.isFormerChampion);
+
+    const matches: Array<{ red: string | null; blue: string | null }> = [];
+    const used = new Set<string>();
+
+    // Helper: check if two athletes conflict (same club or same team)
+    const hasConflict = (a: typeof athletes[0], b: typeof athletes[0]) =>
+      (a.clubId && b.clubId && a.clubId === b.clubId) ||
+      a.teamIds.some(t => b.teamIds.includes(t));
+
+    // Place champions first — each in a different match, paired with a non-champion
+    for (const champ of champions) {
+      // Find the best opponent: a non-champion, no conflict, similar weight
+      let bestOpp: typeof athletes[0] | null = null;
+      for (const opp of others) {
+        if (used.has(opp.id)) continue;
+        if (!hasConflict(champ, opp)) {
+          if (!bestOpp || Math.abs(opp.weight - champ.weight) < Math.abs(bestOpp.weight - champ.weight)) {
+            bestOpp = opp;
+          }
+        }
+      }
+      if (bestOpp) {
+        used.add(champ.id);
+        used.add(bestOpp.id);
+        matches.push({ red: champ.id, blue: bestOpp.id });
+      } else {
+        // No suitable non-champion — place champion alone, they'll get a bye
+        // or be paired with another champion as last resort
+        used.add(champ.id);
+      }
+    }
+
+    // Collect unpaired champions
+    const unpairedChamps = champions.filter(c => used.has(c.id) && !matches.some(m => m.red === c.id || m.blue === c.id));
+    // Re-add to pool: remove from used so they can be paired below
+    for (const c of unpairedChamps) used.delete(c.id);
+
+    // Place remaining athletes into matches, avoiding champion-vs-champion
+    const remaining = sorted.filter(a => !used.has(a.id));
+    while (remaining.length >= 2 && matches.length < numMatches) {
+      const a = remaining.shift()!;
+      const aIsChamp = a.isFormerChampion;
+      // Find best opponent: avoid champion-vs-champion, club conflict, team conflict
+      let bestIdx = -1;
+      for (let i = 0; i < remaining.length; i++) {
+        const b = remaining[i];
+        // Never pair two champions together
+        if (aIsChamp && b.isFormerChampion) continue;
+        if (!hasConflict(a, b)) {
+          bestIdx = i;
+          break;
+        }
+      }
+      // If no ideal opponent found, fall back to any non-champion
+      if (bestIdx === -1 && aIsChamp) {
+        for (let i = 0; i < remaining.length; i++) {
+          if (!remaining[i].isFormerChampion) { bestIdx = i; break; }
+        }
+      }
+      // Last resort: any opponent
+      if (bestIdx === -1) bestIdx = 0;
+      const b = remaining.splice(bestIdx, 1)[0];
+      matches.push({ red: a.id, blue: b.id });
+    }
+
+    // If odd number and there's a leftover athlete, they get a bye
+    if (hasBye && remaining.length === 1) {
+      const byeAthlete = remaining[0];
+      // Bye athletes get a match solo (they advance automatically)
+      matches.push({ red: byeAthlete.id, blue: null });
+    }
+
+    return matches;
+  }
+
   async generateMatches(competitionId: string, athleteIds: string[], matId?: string) {
     if (athleteIds.length < 2) {
       throw new BadRequestException('Au moins 2 athlètes requis');
@@ -420,43 +524,62 @@ export class CompetitionsService {
     const available = athleteIds.filter(id => !alreadyPaired.has(id));
     if (available.length < 2) throw new BadRequestException('Tous les athlètes déjà appariés');
 
-    // Fetch signup data for club-aware shuffling
-    const signupsForShuffle = await this.prisma.competitionSignup.findMany({
+    // Delete existing matches for these athletes to allow regeneration
+    await this.prisma.match.deleteMany({
+      where: {
+        competitionId,
+        OR: [
+          { redCornerId: { in: available } },
+          { blueCornerId: { in: available } },
+          { redCornerId: null, blueCornerId: null }, // also clean empty placeholders
+        ],
+      },
+    });
+
+    // Fetch signup data with weight, champion status, and club for seeding
+    const signups = await this.prisma.competitionSignup.findMany({
       where: { competitionId, personId: { in: available }, status: 'APPROVED' as any },
       include: { person: { select: { id: true, clubId: true } } },
     });
-    const athleteClubMap = new Map<string, string | null>(
-      signupsForShuffle.map((s: any) => [s.personId, s.person?.clubId || null])
-    );
-    const shuffledPairs = available.map((id: string) => ({
-      personId: id,
-      clubId: athleteClubMap.get(id) || null,
-    }));
-    const shuffled = this.shuffleByClub(shuffledPairs).map((a: any) => a.personId);
-    const mats = await this.prisma.mat.findMany({ where: { competitionId }, orderBy: { number: 'asc' } });
-    if (mats.length === 0) throw new BadRequestException('Aucun tapis disponible');
 
-    // Calculate bracket size (next power of 2)
-    let bracketSize = 1;
-    while (bracketSize < available.length) bracketSize *= 2;
-    const numFirstRoundMatches = bracketSize / 2;
+    const teams = await this.prisma.team.findMany({
+      where: { competitionId },
+      include: { members: { select: { personId: true } } },
+    });
 
-    // Create ALL bracket matches (including empty placeholders for future rounds)
-    const allMatches: any[] = [];
+    const athletes = available.map(id => {
+      const signup = signups.find(s => s.personId === id);
+      const personTeamIds = teams
+        .filter(t => t.members.some(m => m.personId === id))
+        .map(t => t.id);
+      return {
+        id,
+        weight: signup?.weight ?? 0,
+        isFormerChampion: signup?.isFormerChampion ?? false,
+        clubId: signup?.person?.clubId ?? undefined,
+        teamIds: personTeamIds,
+      };
+    });
 
-    const byes = bracketSize - available.length;
-
-    // Round 1 matches — handle byes
-    let athleteIdx = 0;
-    for (let i = 0; i < numFirstRoundMatches; i++) {
-      const red = athleteIdx < available.length ? shuffled[athleteIdx++] : null;
-      const blue = athleteIdx < available.length ? shuffled[athleteIdx++] : null;
-      const assignedMatId = matId || mats[i % mats.length].id;
-
-      if (!red && !blue) {
-        // Both slots empty — create placeholder (needed for bracket tree structure)
+    // Handle 3 athletes: round-robin
+    if (athletes.length === 3) {
+      const mats = await this.prisma.mat.findMany({ where: { competitionId }, orderBy: { number: 'asc' } });
+      if (mats.length === 0) throw new BadRequestException('Aucun tapis disponible');
+      const [a, b, c] = athletes;
+      const allMatches: any[] = [];
+      const pairs = [[a, b], [b, c], [a, c]];
+      for (let i = 0; i < pairs.length; i++) {
+        const assignedMatId = matId || mats[i % mats.length].id;
         const match = await this.prisma.match.create({
-          data: { competitionId, matId: assignedMatId, round: 1, bracketPosition: i + 1, status: 'UPCOMING' },
+          data: {
+            competitionId,
+            redCornerId: pairs[i][0].id,
+            blueCornerId: pairs[i][1].id,
+            matId: assignedMatId,
+            round: 1,
+            bracketPosition: i + 1,
+            status: 'UPCOMING',
+          },
           include: {
             mat: { select: { id: true, name: true, number: true } },
             redCorner: { select: { id: true, firstName: true, lastName: true } },
@@ -464,14 +587,32 @@ export class CompetitionsService {
           },
         });
         allMatches.push(match);
-        continue;
       }
+      return { data: { matches: allMatches, total: allMatches.length, rounds: 1, type: 'round-robin' } };
+    }
 
-      if (red && !blue) {
-        // BYE: only one athlete — they advance directly, no opponent
+    // Calculate bracket size (next power of 2)
+    let bracketSize = 1;
+    while (bracketSize < athletes.length) bracketSize *= 2;
+
+    const firstRoundMatches = this.seedFirstRound(athletes);
+
+    const mats = await this.prisma.mat.findMany({ where: { competitionId }, orderBy: { number: 'asc' } });
+    if (mats.length === 0) throw new BadRequestException('Aucun tapis disponible');
+
+    const allMatches: any[] = [];
+    const round1Winners: string[] = [];
+
+    // Create round 1 matches from seeded pairs
+    for (let i = 0; i < firstRoundMatches.length; i++) {
+      const pair = firstRoundMatches[i];
+      const assignedMatId = matId || mats[i % mats.length].id;
+
+      if (pair.blue === null) {
+        // BYE: solo athlete advances automatically
         const match = await this.prisma.match.create({
           data: {
-            competitionId, redCornerId: red, matId: assignedMatId,
+            competitionId, redCornerId: pair.red, matId: assignedMatId,
             round: 1, bracketPosition: i + 1,
             status: 'FINISHED', winnerSide: 'red', winMethod: 'BYE',
             redScore: 0, blueScore: 0,
@@ -483,87 +624,17 @@ export class CompetitionsService {
           },
         });
         allMatches.push(match);
-        // Auto-advance the bye athlete to the next round
-        const nextPos = Math.ceil((i + 1) / 2);
-        const isRed = (i + 1) % 2 === 1;
-        // Will be placed in round 2 placeholder below
-        continue;
-      }
-
-      // Normal match: both athletes present
-      const match = await this.prisma.match.create({
-        data: {
-          competitionId,
-          redCornerId: red || undefined,
-          blueCornerId: blue || undefined,
-          matId: assignedMatId,
-          round: 1,
-          bracketPosition: i + 1,
-          status: 'UPCOMING',
-        },
-        include: {
-          mat: { select: { id: true, name: true, number: true } },
-          redCorner: { select: { id: true, firstName: true, lastName: true } },
-          blueCorner: { select: { id: true, firstName: true, lastName: true } },
-        },
-      });
-      allMatches.push(match);
-    }
-
-    // Pre-seed bye athletes into round 2 positions
-    // Re-scan round 1 matches for bye winners
-    for (const m of allMatches) {
-      if (m.round === 1 && m.winMethod === 'BYE' && m.redCornerId) {
-        const nextPos = Math.ceil((m.bracketPosition || 1) / 2);
-        const isRed = (m.bracketPosition || 1) % 2 === 1;
-        // Find or create the round 2 match at this position
-        let round2Match = await this.prisma.match.findFirst({
-          where: { competitionId, round: 2, bracketPosition: nextPos },
-        });
-        if (round2Match) {
-          await this.prisma.match.update({
-            where: { id: round2Match.id },
-            data: isRed ? { redCornerId: m.redCornerId } : { blueCornerId: m.redCornerId },
-          });
-        } else {
-          // Create round 2 match with bye athlete pre-seeded
-          const assignedMatId = mats[(nextPos - 1) % mats.length].id;
-          round2Match = await this.prisma.match.create({
-            data: {
-              competitionId, matId: assignedMatId, round: 2, bracketPosition: nextPos,
-              status: 'UPCOMING',
-              ...(isRed ? { redCornerId: m.redCornerId } : { blueCornerId: m.redCornerId }),
-            },
-            include: {
-              mat: { select: { id: true, name: true, number: true } },
-              redCorner: { select: { id: true, firstName: true, lastName: true } },
-              blueCorner: { select: { id: true, firstName: true, lastName: true } },
-            },
-          });
-          allMatches.push(round2Match);
-        }
-      }
-    }
-
-    // Generate placeholder matches for rounds 2, 3, etc. (skip existing)
-    let currentRound = 2;
-    let currentBracketSize = numFirstRoundMatches / 2;
-
-    while (currentBracketSize >= 1) {
-      for (let i = 0; i < currentBracketSize; i++) {
-        // Skip if match already exists (bye pre-seeding)
-        const existing = await this.prisma.match.findFirst({
-          where: { competitionId, round: currentRound, bracketPosition: i + 1 },
-        });
-        if (existing) continue;
-
-        const assignedMatId = mats[i % mats.length].id;
+        if (pair.red) round1Winners.push(pair.red);
+      } else {
+        // Normal match
         const match = await this.prisma.match.create({
           data: {
             competitionId,
+            redCornerId: pair.red,
+            blueCornerId: pair.blue,
             matId: assignedMatId,
-            round: currentRound,
-            bracketPosition: (i + 1),
+            round: 1,
+            bracketPosition: i + 1,
             status: 'UPCOMING',
           },
           include: {
@@ -574,9 +645,62 @@ export class CompetitionsService {
         });
         allMatches.push(match);
       }
-      currentRound++;
-      currentBracketSize = Math.floor(currentBracketSize / 2);
     }
+
+    // Generate subsequent rounds from round1Winners + round 1 match winners
+    let currentRoundWinners = round1Winners;
+    let currentRound = 2;
+    const totalRealMatches = firstRoundMatches.filter(m => m.blue !== null).length;
+
+    // If only 2 athletes (1 match) that's the final — no placeholder rounds needed
+    if (totalRealMatches > 1 || round1Winners.length > 0) {
+    let remainingSlots = totalRealMatches;
+    while (remainingSlots > 1) {
+      remainingSlots = Math.ceil(remainingSlots / 2);
+      for (let i = 0; i < remainingSlots; i++) {
+        const assignedMatId = mats[i % mats.length].id;
+        // Check if a match already exists at this position (from bye pre-seeding)
+        const existing = await this.prisma.match.findFirst({
+          where: { competitionId, round: currentRound, bracketPosition: i + 1 },
+        });
+        if (!existing) {
+          const match = await this.prisma.match.create({
+            data: {
+              competitionId,
+              matId: assignedMatId,
+              round: currentRound,
+              bracketPosition: i + 1,
+              status: 'UPCOMING',
+            },
+            include: {
+              mat: { select: { id: true, name: true, number: true } },
+              redCorner: { select: { id: true, firstName: true, lastName: true } },
+              blueCorner: { select: { id: true, firstName: true, lastName: true } },
+            },
+          });
+          allMatches.push(match);
+        }
+      }
+      currentRound++;
+    }
+
+    // Pre-seed bye athletes into round 2
+    for (let i = 0; i < round1Winners.length; i++) {
+      const nextPos = Math.floor(i / 2) + 1;
+      const isRed = i % 2 === 0;
+      const round2Match = await this.prisma.match.findFirst({
+        where: { competitionId, round: 2, bracketPosition: nextPos },
+      });
+      if (round2Match) {
+        await this.prisma.match.update({
+          where: { id: round2Match.id },
+          data: isRed
+            ? { redCornerId: round1Winners[i] }
+            : { blueCornerId: round1Winners[i] },
+        });
+      }
+    }
+    } // end if (needs more rounds)
 
     return { data: { matches: allMatches, total: allMatches.length, rounds: currentRound - 1 } };
   }
@@ -644,6 +768,7 @@ export class CompetitionsService {
           },
           orderBy: [{ round: 'asc' }, { createdAt: 'asc' }],
         },
+        teams: { include: { members: { include: { person: { select: { id: true, firstName: true, lastName: true } } } } } },
       },
     });
     if (!competition) throw new NotFoundException("Compétition non trouvée");
@@ -723,6 +848,22 @@ export class CompetitionsService {
       data: { weight },
     });
     return { message: "Poids mis à jour", data: updated };
+  }
+
+  async moderateToggleChampion(competitionId: string, token: string, signupId: string, isFormerChampion: boolean) {
+    const competition = await this.prisma.competition.findUnique({ where: { id: competitionId } });
+    if (!competition || !competition.moderationToken || competition.moderationToken !== token) {
+      throw new ForbiddenException("Token de modération invalide");
+    }
+    const signup = await this.prisma.competitionSignup.findUnique({ where: { id: signupId } });
+    if (!signup || signup.competitionId !== competitionId) {
+      throw new NotFoundException("Inscription non trouvée");
+    }
+    await this.prisma.competitionSignup.update({
+      where: { id: signupId },
+      data: { isFormerChampion },
+    });
+    return { message: 'Statut champion mis à jour' };
   }
 
   async moderateUpdateMatchScore(
@@ -955,6 +1096,51 @@ export class CompetitionsService {
       throw new ForbiddenException("Token de modération invalide");
     }
     return this.replaceMatchAthlete(matchId, side, newPersonId);
+  }
+
+  async moderateGetTeams(competitionId: string, token: string) {
+    const competition = await this.prisma.competition.findUnique({ where: { id: competitionId } });
+    if (!competition || !competition.moderationToken || competition.moderationToken !== token) {
+      throw new ForbiddenException("Token de modération invalide");
+    }
+    return this.prisma.team.findMany({
+      where: { competitionId },
+      include: { members: { include: { person: { select: { id: true, firstName: true, lastName: true, club: { select: { id: true, name: true } } } } } } },
+    });
+  }
+
+  async moderateCreateTeam(competitionId: string, token: string, name: string) {
+    const competition = await this.prisma.competition.findUnique({ where: { id: competitionId } });
+    if (!competition || !competition.moderationToken || competition.moderationToken !== token) {
+      throw new ForbiddenException("Token de modération invalide");
+    }
+    return this.prisma.team.create({ data: { competitionId, name }, include: { members: true } });
+  }
+
+  async moderateAddTeamMember(competitionId: string, token: string, teamId: string, personId: string) {
+    const competition = await this.prisma.competition.findUnique({ where: { id: competitionId } });
+    if (!competition || !competition.moderationToken || competition.moderationToken !== token) {
+      throw new ForbiddenException("Token de modération invalide");
+    }
+    return this.prisma.teamMember.create({ data: { teamId, personId }, include: { person: { select: { id: true, firstName: true, lastName: true } } } });
+  }
+
+  async moderateRemoveTeamMember(competitionId: string, token: string, teamId: string, personId: string) {
+    const competition = await this.prisma.competition.findUnique({ where: { id: competitionId } });
+    if (!competition || !competition.moderationToken || competition.moderationToken !== token) {
+      throw new ForbiddenException("Token de modération invalide");
+    }
+    await this.prisma.teamMember.deleteMany({ where: { teamId, personId } });
+    return { message: 'Membre retiré' };
+  }
+
+  async moderateDeleteTeam(competitionId: string, token: string, teamId: string) {
+    const competition = await this.prisma.competition.findUnique({ where: { id: competitionId } });
+    if (!competition || !competition.moderationToken || competition.moderationToken !== token) {
+      throw new ForbiddenException("Token de modération invalide");
+    }
+    await this.prisma.team.delete({ where: { id: teamId } });
+    return { message: 'Équipe supprimée' };
   }
 
   private computeIsRegistrationOpen(competitionDate: Date): boolean {

@@ -572,7 +572,7 @@ export default function CmsDashboard(): React.ReactElement {
               <p style={{ margin: "0 0 8px", color: "var(--muted)", fontSize: "0.85rem", fontWeight: 600 }}>Upload Rapide (1 image)</p>
               <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 200 }}>
-                  <FileUpload label="Image" accept=".png,.jpg,.jpeg,.webp" onUploaded={setMediaImageUrl} currentUrl={mediaImageUrl || null} />
+                  <FileUpload label="Image" accept=".png,.jpg,.jpeg,.webp" hint="Dimensions recommandées : 1200×630 px (paysage)" onUploaded={setMediaImageUrl} currentUrl={mediaImageUrl || null} />
                 </div>
                 <button type="button" className="btn primary" onClick={handleCreateMedia} disabled={mediaSaving || !mediaImageUrl}>
                   {mediaSaving ? "..." : "Ajouter"}
@@ -709,7 +709,7 @@ export default function CmsDashboard(): React.ReactElement {
                 <textarea value={articleExcerpt} onChange={(e) => setArticleExcerpt(e.target.value)} rows={2} style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 12, padding: "11px 12px", width: "100%", resize: "vertical" }} />
               </label>
               <div style={{ marginBottom: 12 }}>
-                <FileUpload label="Image (optionnelle)" accept=".jpg,.jpeg,.png,.webp" onUploaded={setArticleImageUrl} currentUrl={articleImageUrl || null} />
+                <FileUpload label="Image (optionnelle)" accept=".jpg,.jpeg,.png,.webp" hint="Dimensions recommandées : 800×400 px (paysage)" onUploaded={setArticleImageUrl} currentUrl={articleImageUrl || null} />
               </div>
               <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 12 }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: "var(--text)" }}>

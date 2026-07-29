@@ -318,6 +318,17 @@ export class CompetitionsController {
     return this.competitionsService.moderateUpdateWeight(id, token, signupId, body.weight);
   }
 
+  @Patch('moderate/:id/signups/:signupId/champion')
+  @ApiOperation({ summary: 'Marquer/démarquer champion (modération publique)' })
+  async moderateToggleChampion(
+    @Param('id') id: string,
+    @Param('signupId') signupId: string,
+    @Query('token') token: string,
+    @Body() body: { isFormerChampion: boolean },
+  ) {
+    return this.competitionsService.moderateToggleChampion(id, token, signupId, body.isFormerChampion);
+  }
+
   @Patch('moderate/:id/matches/:matchId')
   @ApiOperation({ summary: 'Modifier un score de match (modération publique)' })
   async moderateUpdateMatch(
@@ -411,5 +422,30 @@ export class CompetitionsController {
     @Body() body: { side: 'red' | 'blue'; newPersonId: string },
   ) {
     return this.competitionsService.moderateReplaceAthlete(id, token, matchId, body.side, body.newPersonId);
+  }
+
+  @Get('moderate/:id/teams')
+  async moderateGetTeams(@Param('id') id: string, @Query('token') token: string) {
+    return this.competitionsService.moderateGetTeams(id, token);
+  }
+
+  @Post('moderate/:id/teams')
+  async moderateCreateTeam(@Param('id') id: string, @Query('token') token: string, @Body() body: { name: string }) {
+    return this.competitionsService.moderateCreateTeam(id, token, body.name);
+  }
+
+  @Post('moderate/:id/teams/:teamId/members')
+  async moderateAddTeamMember(@Param('id') id: string, @Param('teamId') teamId: string, @Query('token') token: string, @Body() body: { personId: string }) {
+    return this.competitionsService.moderateAddTeamMember(id, token, teamId, body.personId);
+  }
+
+  @Delete('moderate/:id/teams/:teamId/members/:personId')
+  async moderateRemoveTeamMember(@Param('id') id: string, @Param('teamId') teamId: string, @Param('personId') personId: string, @Query('token') token: string) {
+    return this.competitionsService.moderateRemoveTeamMember(id, token, teamId, personId);
+  }
+
+  @Delete('moderate/:id/teams/:teamId')
+  async moderateDeleteTeam(@Param('id') id: string, @Param('teamId') teamId: string, @Query('token') token: string) {
+    return this.competitionsService.moderateDeleteTeam(id, token, teamId);
   }
 }

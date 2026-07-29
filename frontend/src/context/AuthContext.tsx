@@ -12,7 +12,7 @@ import type { User, LoginPayload } from "../types";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<User | null>;
+  login: (loginId: string, password: string, isEmail?: boolean) => Promise<User | null>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<User | null>;
 }
@@ -34,15 +34,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return userData;
   }
 
-  async function login(email: string, password: string): Promise<User | null> {
+  async function login(loginId: string, password: string, isEmail?: boolean): Promise<User | null> {
     const response = await api.post<{
       data: { token: string; refreshToken?: string; user: User };
-    }>("/auth/login", { email, password } as LoginPayload);
+    }>("/auth/login", {
+      [isEmail ? "email" : "username"]: loginId,
+      password,
+    });
     const payload = response.data.data;
     storage.set("ftjj_token", payload.token);
     if (payload.refreshToken) storage.set("ftjj_refresh", payload.refreshToken);
-    setUser(payload.user);
-    return payload.user;
+    // Immediately refresh to get the full user object (including club._id)
+    // The login response may have a partial user without nested IDs.
+    const fullUser = await api.get<{ data: { user: User } }>("/auth/me");
+    const userData = fullUser.data.data.user;
+    setUser(userData);
+    return userData;
   }
 
   async function logout(): Promise<void> {

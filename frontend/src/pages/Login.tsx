@@ -14,7 +14,7 @@ function dashboardPathForRole(role: UserRole | string): string {
 }
 
 export default function Login(): React.ReactElement {
-  const [email, setEmail] = useState("admin@example.com");
+  const [loginId, setLoginId] = useState("admin");
   const [password, setPassword] = useState("Admin123!");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,14 +25,15 @@ export default function Login(): React.ReactElement {
     e.preventDefault();
     setError("");
 
-    if (!email.trim() || !password.trim()) {
+    if (!loginId.trim() || !password.trim()) {
       setError("Veuillez remplir tous les champs.");
       return;
     }
 
     setLoading(true);
     try {
-      const user = await login(email, password);
+      const isEmail = loginId.includes("@");
+      const user = await login(loginId, password, isEmail);
       if (user) {
         navigate(dashboardPathForRole(user.role));
       }
@@ -107,12 +108,12 @@ export default function Login(): React.ReactElement {
               color: "var(--muted)",
             }}
           >
-            Adresse email
+            Email ou nom d'utilisateur
             <input
-              type="email"
-              placeholder="exemple@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="admin ou admin@example.com"
+              value={loginId}
+              onChange={(e) => setLoginId(e.target.value)}
               required
               style={{
                 background: "var(--bg)",

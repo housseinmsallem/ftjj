@@ -39,6 +39,27 @@ export class AuthController {
     return this.authService.registerClubOwner(dto);
   }
 
+  @Post('register-referee')
+  @ApiOperation({ summary: "Inscription d'un arbitre (compte en attente d'approbation)" })
+  async registerReferee(@Body() body: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    arabicFirstName?: string;
+    arabicLastName?: string;
+    dateOfBirth: string;
+    nationality?: string;
+    gender: string;
+    identityDocumentType: string;
+    identityDocumentUrl?: string;
+    birthCertificateUrl?: string;
+    photoUrl?: string;
+    refereeDegreeAttestationUrl?: string;
+  }) {
+    return this.authService.registerReferee(body);
+  }
+
   @Post('refresh')
   @ApiOperation({ summary: 'Rafraîchir le token JWT' })
   async refresh(@Body() dto: RefreshTokenDto) {

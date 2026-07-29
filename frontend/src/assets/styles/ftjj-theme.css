@@ -20,7 +20,7 @@ Requires PHP: 8.0
   --text: black;
   --alt-text: #0000;
   --muted: rgba(255, 255, 255, 0.68);
-  --border: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.22);
 }
 
 * {
@@ -590,18 +590,39 @@ body.admin-bar .site-header {
   gap: 12px;
   flex-wrap: wrap;
   margin: 0 0 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 14px;
 }
 
 .filterbar input,
 .form input,
 .form select,
 .form textarea {
-  background: #0d0f17;
+  background: #11131c;
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 2px solid rgba(255, 255, 255, 0.22);
   border-radius: 10px;
-  padding: 13px 14px;
+  padding: 13px 14px 13px 42px;
   min-height: 46px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+
+.filterbar input:focus,
+.form input:focus,
+.form select:focus,
+.form textarea:focus {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(213, 19, 50, 0.25), 0 1px 4px rgba(0,0,0,0.3);
+  outline: none;
+}
+
+.filterbar input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23ffffff80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 13px center;
 }
 
 .table-wrap {
@@ -1151,17 +1172,37 @@ body.admin-bar .site-header {
   gap: 12px;
   align-items: center;
   margin: 24px 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 14px;
 }
 
 .ftjj-server-filter input,
 .ftjj-server-filter select {
   min-height: 52px;
   min-width: 220px;
-  background: #0d0f17;
+  background: #11131c;
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.24);
   border-radius: 12px;
   padding: 12px 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+
+.ftjj-server-filter input:focus,
+.ftjj-server-filter select:focus {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(213, 19, 50, 0.25), 0 1px 4px rgba(0,0,0,0.3);
+  outline: none;
+}
+
+.ftjj-server-filter input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23ffffff80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 14px center;
+  padding-left: 46px;
 }
 
 .ftjj-server-filter button,

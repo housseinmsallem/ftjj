@@ -213,7 +213,7 @@ export default function ClubCompetitionRegistration(): React.ReactElement {
           style={{
             marginBottom: 24,
             padding: 16,
-            background: "var(--panel)",
+            background: "white",
             borderRadius: 12,
             border: "1px solid var(--border)",
             display: "flex",

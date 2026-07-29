@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from "uuid";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
 import { LoginDto, RegisterClubOwnerDto } from "./auth.dto";
-import { Role } from "@prisma/client";
+import { Role, Gender, IdentityDocumentType, PersonType } from "@prisma/client";
 
 @Injectable()
 export class AuthService {
@@ -22,12 +22,16 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    if (!dto.email && !dto.username) {
+      throw new BadRequestException("Email ou nom d'utilisateur requis");
+    }
+
+    const user = dto.username
+      ? await this.prisma.user.findUnique({ where: { username: dto.username } })
+      : await this.prisma.user.findUnique({ where: { email: dto.email! } });
 
     if (!user) {
-      throw new UnauthorizedException("Email ou mot de passe incorrect");
+      throw new UnauthorizedException("Identifiants invalides");
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
@@ -137,7 +141,7 @@ export class AuthService {
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { club: true },
+      include: { club: true, referee: true },
     });
 
     if (!user) {
@@ -146,6 +150,66 @@ export class AuthService {
 
     const { password, ...userWithoutPassword } = user;
     return { data: { user: userWithoutPassword } };
+  }
+
+  async registerReferee(data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    arabicFirstName?: string;
+    arabicLastName?: string;
+    dateOfBirth: string;
+    nationality?: string;
+    gender: string;
+    identityDocumentType: string;
+    identityDocumentUrl?: string;
+    birthCertificateUrl?: string;
+    photoUrl?: string;
+    refereeDegreeAttestationUrl?: string;
+  }) {
+    const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) throw new BadRequestException("Cet email est déjà utilisé");
+
+    const hashedPassword = await bcrypt.hash(data.password, 12);
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: data.email,
+        password: hashedPassword,
+        role: Role.REFEREE,
+        isApproved: false,
+      },
+    });
+
+    const person = await this.prisma.person.create({
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        arabicFirstName: data.arabicFirstName,
+        arabicLastName: data.arabicLastName,
+        dateOfBirth: new Date(data.dateOfBirth),
+        nationality: data.nationality || "Tunisienne",
+        gender: data.gender as Gender,
+        identityDocumentType: data.identityDocumentType as IdentityDocumentType,
+        identityDocumentUrl: data.identityDocumentUrl,
+        birthCertificateUrl: data.birthCertificateUrl,
+        photoUrl: data.photoUrl,
+        type: PersonType.REFEREE,
+      },
+    });
+
+    await this.prisma.referee.create({
+      data: {
+        personId: person.id,
+        refereeDegreeAttestationUrl: data.refereeDegreeAttestationUrl,
+        userId: user.id,
+      },
+    });
+
+    return {
+      message: "Votre demande d'inscription a été soumise. Elle sera examinée par l'administration.",
+    };
   }
 
   async getPendingRegistrations() {
