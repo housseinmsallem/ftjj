@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import FileUpload from "../components/shared/FileUpload";
 import { toast } from "sonner";
+import { COUNTRIES } from "../utils/formOptions";
 
 export default function RefereeRegister(): React.ReactElement {
   const navigate = useNavigate();
@@ -17,7 +18,6 @@ export default function RefereeRegister(): React.ReactElement {
   const [identityDocumentType, setIdentityDocumentType] = useState("CIN");
 
   const [identityDocumentUrl, setIdentityDocumentUrl] = useState("");
-  const [birthCertificateUrl, setBirthCertificateUrl] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [refereeDegreeAttestationUrl, setRefereeDegreeAttestationUrl] =
     useState("");
@@ -58,7 +58,6 @@ export default function RefereeRegister(): React.ReactElement {
         gender,
         identityDocumentType,
         identityDocumentUrl: identityDocumentUrl || undefined,
-        birthCertificateUrl: birthCertificateUrl || undefined,
         photoUrl: photoUrl || undefined,
         refereeDegreeAttestationUrl:
           refereeDegreeAttestationUrl || undefined,
@@ -101,7 +100,7 @@ export default function RefereeRegister(): React.ReactElement {
         <div
           className="auth-card"
           style={{
-            background: "var(--panel)",
+            background: "white",
             borderRadius: 16,
             padding: "40px 36px",
             width: "min(500px, 100%)",
@@ -160,7 +159,7 @@ export default function RefereeRegister(): React.ReactElement {
       <div
         className="auth-card"
         style={{
-          background: "var(--panel)",
+          background: "white",
           borderRadius: 16,
           padding: "40px 36px",
           width: "min(540px, 100%)",
@@ -270,13 +269,15 @@ export default function RefereeRegister(): React.ReactElement {
 
           <label style={labelStyle}>
             Nationalité
-            <input
-              type="text"
-              placeholder="Tunisienne"
+            <select
               value={nationality}
               onChange={(e) => setNationality(e.target.value)}
               style={inputStyle}
-            />
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </label>
 
           <label style={labelStyle}>
@@ -313,13 +314,7 @@ export default function RefereeRegister(): React.ReactElement {
             hint="Copie de votre CIN ou extrait de naissance"
           />
 
-          <FileUpload
-            label="Extrait de naissance (PDF/Image)"
-            accept=".pdf,.jpg,.jpeg,.png"
-            onUploaded={setBirthCertificateUrl}
-            currentUrl={birthCertificateUrl || null}
-            hint="Optionnel"
-          />
+          {/* Extrait de naissance non requis pour les arbitres */}
 
           <FileUpload
             label="Photo d'identité"

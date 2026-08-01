@@ -13,6 +13,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 
+    // Unexpected (non-HTTP) errors must be logged so they can be debugged.
+    // In a default NestJS setup the framework logs these automatically; this
+    // custom filter replaces that behaviour, so we log explicitly here.
+    if (!(exception instanceof HttpException)) {
+      console.error('\n===== UNEXPECTED ERROR =====');
+      console.error(exception instanceof Error ? exception.stack : exception);
+      console.error('==============================\n');
+    }
+
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Une erreur interne est survenue';
 

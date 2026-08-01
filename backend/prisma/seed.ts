@@ -377,6 +377,43 @@ async function main() {
       "✅ Club en attente d'approbation créé: nouveau.club@example.com",
     );
 
+    // Create a pending referee registration
+    const refereePerson = await prisma.person.create({
+      data: {
+        firstName: "Karim",
+        lastName: "Mansour",
+        dateOfBirth: new Date("1990-05-20"),
+        nationality: "Tunisienne",
+        gender: Gender.MALE,
+        identityDocumentType: IdentityDocumentType.CIN,
+        identityDocumentUrl: "/uploads/documents/cin-placeholder.pdf",
+        birthCertificateUrl: "/uploads/documents/birth-cert-placeholder.pdf",
+        photoUrl: randomPhoto(),
+        type: PersonType.REFEREE,
+      },
+    });
+
+    await prisma.referee.create({
+      data: {
+        personId: refereePerson.id,
+        refereeDegreeAttestationUrl: "/uploads/documents/referee-degree-placeholder.pdf",
+      },
+    });
+
+    await prisma.user.create({
+      data: {
+        email: "arbitre.pending@example.com",
+        username: "arbitrepending",
+        password: samplePassword,
+        role: Role.REFEREE,
+        isApproved: false,
+        referee: { connect: { personId: refereePerson.id } },
+      },
+    });
+    console.log(
+      "✅ Arbitre en attente d'approbation créé: arbitre.pending@example.com",
+    );
+
     // Create a sample competition
     const competition = await prisma.competition.create({
       data: {
@@ -515,6 +552,7 @@ async function main() {
   console.log("  Admin:    admin@example.com / Admin123!");
   console.log("  Club:     club@example.com / Club123!");
   console.log("  En attente: nouveau.club@example.com / Club123!");
+  console.log("  Arbitre en attente: arbitre.pending@example.com / Club123!");
   console.log("================================\n");
 }
 

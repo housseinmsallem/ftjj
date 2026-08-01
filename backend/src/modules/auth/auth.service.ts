@@ -164,12 +164,17 @@ export class AuthService {
     gender: string;
     identityDocumentType: string;
     identityDocumentUrl?: string;
-    birthCertificateUrl?: string;
     photoUrl?: string;
     refereeDegreeAttestationUrl?: string;
   }) {
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existing) throw new BadRequestException("Cet email est déjà utilisé");
+
+    // Validate date of birth
+    const dob = new Date(data.dateOfBirth);
+    if (isNaN(dob.getTime()) || dob.getFullYear() < 1900 || dob.getFullYear() > new Date().getFullYear()) {
+      throw new BadRequestException("Date de naissance invalide");
+    }
 
     const hashedPassword = await bcrypt.hash(data.password, 12);
 
@@ -193,7 +198,6 @@ export class AuthService {
         gender: data.gender as Gender,
         identityDocumentType: data.identityDocumentType as IdentityDocumentType,
         identityDocumentUrl: data.identityDocumentUrl,
-        birthCertificateUrl: data.birthCertificateUrl,
         photoUrl: data.photoUrl,
         type: PersonType.REFEREE,
       },
@@ -215,10 +219,13 @@ export class AuthService {
   async getPendingRegistrations() {
     const pending = await this.prisma.user.findMany({
       where: {
-        role: Role.CLUB_OWNER,
+        role: { in: [Role.CLUB_OWNER, Role.REFEREE] },
         isApproved: false,
       },
-      include: { club: { include: { documents: true } } },
+      include: {
+        club: { include: { documents: true } },
+        referee: { include: { person: { select: { id: true, firstName: true, lastName: true, dateOfBirth: true, gender: true, nationality: true, identityDocumentType: true, identityDocumentUrl: true, birthCertificateUrl: true, photoUrl: true } } } },
+      },
       orderBy: { createdAt: "desc" },
     });
 
@@ -237,9 +244,9 @@ export class AuthService {
       throw new NotFoundException("Utilisateur non trouvé");
     }
 
-    if (user.role !== Role.CLUB_OWNER) {
+    if (user.role !== Role.CLUB_OWNER && user.role !== Role.REFEREE) {
       throw new BadRequestException(
-        "Cet utilisateur n'est pas un propriétaire de club",
+        "Cet utilisateur n'est ni un propriétaire de club ni un arbitre",
       );
     }
 
@@ -247,7 +254,7 @@ export class AuthService {
       throw new BadRequestException("Ce compte est déjà approuvé");
     }
 
-    // Generate a temporary password for the club owner
+    // Generate a temporary password
     const temporaryPassword = this.generateTemporaryPassword();
     const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
 
@@ -261,10 +268,11 @@ export class AuthService {
 
     // Send welcome email with temporary password
     try {
+      const orgName = user.club?.name || "Arbitre FTJJ";
       await this.emailService.sendWelcomeEmail(
         user.email,
         temporaryPassword,
-        user.club?.name || "Club",
+        orgName,
       );
     } catch (error) {
       console.error("Échec d'envoi de l'email de bienvenue:", error.message);
@@ -272,14 +280,17 @@ export class AuthService {
 
     return {
       message:
-        "Le compte a été approuvé avec succès. Un email a été envoyé au propriétaire du club.",
+        "Le compte a été approuvé avec succès. Un email a été envoyé au demandeur.",
     };
   }
 
   async rejectRegistration(userId: string, adminComment: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { club: true },
+      include: {
+        club: true,
+        referee: { include: { person: true } },
+      },
     });
 
     if (!user) {
@@ -290,21 +301,33 @@ export class AuthService {
       throw new BadRequestException("Ce compte est déjà approuvé");
     }
 
-    // Send rejection email
+    // Send rejection email before deletion
     try {
       await this.emailService.sendRejectionEmail(
         user.email,
         adminComment || "Votre dossier ne répond pas aux critères requis.",
       );
     } catch (error) {
-      console.error("Échec d'envoi de l'email de refus:", error.message);
+      console.error("Echec d'envoi de l'email de refus:", error.message);
     }
 
-    // Optionally delete the user or just keep rejected
-    // For audit purposes, we'll keep the user but they remain unapproved
+    // Delete the club first (club.ownerId references user, so user can't be deleted while club exists)
+    if (user.club) {
+      await this.prisma.clubDocument.deleteMany({ where: { clubId: user.club.id } }).catch(() => {});
+      await this.prisma.club.delete({ where: { id: user.club.id } }).catch(() => {});
+    }
+
+    // Delete the referee's person record if it exists
+    if (user.referee?.person?.id) {
+      await this.prisma.person.delete({ where: { id: user.referee.person.id } }).catch(() => {});
+    }
+
+    // Delete the user (cascades to referee, etc.)
+    await this.prisma.user.delete({ where: { id: userId } });
+
     return {
       message:
-        "La demande d'inscription a été refusée. Un email a été envoyé au demandeur.",
+        "La demande d'inscription a ete refusee et supprimee. Un email a ete envoye au demandeur.",
     };
   }
 

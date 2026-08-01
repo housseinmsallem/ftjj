@@ -209,6 +209,7 @@ export const portalCards: PortalCard[] = [
     actions: [
       { label: "Connexion arbitre", to: "/login" },
       { label: "Annuaire arbitres", to: "/referees" },
+      { label: "Devenir arbitre", to: "/arbitre/inscription" },
     ],
   },
 ];

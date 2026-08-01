@@ -103,7 +103,7 @@ export default function ClubCompetitionRegistration(): React.ReactElement {
   });
 
   function getSelectedAthlete(): Person | null {
-    return athletes.find((a) => (a._id || a.id) === form.personId) || null;
+    return eligibleAthletes.find((a) => (a._id || a.id) === form.personId) || null;
   }
 
   function hasActiveLicense(person: Person): boolean {
@@ -117,8 +117,27 @@ export default function ClubCompetitionRegistration(): React.ReactElement {
         (person as any).licenseStatus === "ACTIVE"
       );
     }
-    return true; // allow if no license data
+    return false;
   }
+
+  function getLicenseType(person: Person): string | null {
+    const licenses = (person as any).licenses;
+    if (Array.isArray(licenses)) {
+      const active = licenses.find((l: any) => l.isActive);
+      return active?.licenseType || active?.type || null;
+    }
+    return null;
+  }
+
+  // Filter athletes: only those with active licence.
+  // If competition is NOT "Open", also exclude type B licences.
+  const compType = (competition as any)?.type || "";
+  const isOpen = compType.toUpperCase() === "OPEN";
+  const eligibleAthletes = athletes.filter((a) => {
+    if (!hasActiveLicense(a)) return false;
+    if (!isOpen && getLicenseType(a) === "B") return false;
+    return true;
+  });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -524,18 +524,6 @@ export class CompetitionsService {
     const available = athleteIds.filter(id => !alreadyPaired.has(id));
     if (available.length < 2) throw new BadRequestException('Tous les athlètes déjà appariés');
 
-    // Delete existing matches for these athletes to allow regeneration
-    await this.prisma.match.deleteMany({
-      where: {
-        competitionId,
-        OR: [
-          { redCornerId: { in: available } },
-          { blueCornerId: { in: available } },
-          { redCornerId: null, blueCornerId: null }, // also clean empty placeholders
-        ],
-      },
-    });
-
     // Fetch signup data with weight, champion status, and club for seeding
     const signups = await this.prisma.competitionSignup.findMany({
       where: { competitionId, personId: { in: available }, status: 'APPROVED' as any },
@@ -559,6 +547,28 @@ export class CompetitionsService {
         clubId: signup?.person?.clubId ?? undefined,
         teamIds: personTeamIds,
       };
+    });
+
+    // Compute bracket size early so we can scope empty-placeholder deletion
+    // to only the rounds this bracket will recreate (rounds 2+).
+    let bracketSize = 1;
+    if (athletes.length > 3) {
+      while (bracketSize < athletes.length) bracketSize *= 2;
+    }
+    const maxRound = athletes.length <= 3 ? 1 : Math.ceil(Math.log2(bracketSize)) || 1;
+
+    // Delete existing matches for these athletes to allow regeneration.
+    // Only delete empty placeholders in rounds that this bracket will recreate
+    // (round 2+), to avoid destroying other categories' bracket structures.
+    await this.prisma.match.deleteMany({
+      where: {
+        competitionId,
+        OR: [
+          { redCornerId: { in: available } },
+          { blueCornerId: { in: available } },
+          { redCornerId: null, blueCornerId: null, round: { gte: 2, lte: maxRound } },
+        ],
+      },
     });
 
     // Handle 3 athletes: round-robin
@@ -591,9 +601,7 @@ export class CompetitionsService {
       return { data: { matches: allMatches, total: allMatches.length, rounds: 1, type: 'round-robin' } };
     }
 
-    // Calculate bracket size (next power of 2)
-    let bracketSize = 1;
-    while (bracketSize < athletes.length) bracketSize *= 2;
+    // bracketSize and maxRound are already computed above
 
     const firstRoundMatches = this.seedFirstRound(athletes);
 
@@ -783,46 +791,64 @@ export class CompetitionsService {
     const bracketResult = this.buildCategories(approvedSignups, competition.ageDivisions, isIBJJF, seasonYear, competition.date);
     const categories = bracketResult.categories;
 
-    // Group ALL matches by category (including empty placeholder matches)
+    // Group real matches by category (only matches that have at least one athlete from the category)
     const categoryMatches: Record<string, any[]> = {};
     for (const cat of categories) {
       const athleteIdSet = new Set(cat.athletes);
-      // Include matches where at least one athlete is in this category, OR matches that are empty placeholders (no athletes) that belong to this category's bracket
-      const catMatches = competition.matches.filter((m: any) => {
-        // If match has athletes, check if they're in this category
-        if (m.redCornerId || m.blueCornerId) {
-          return athleteIdSet.has(m.redCornerId) || athleteIdSet.has(m.blueCornerId);
-        }
-        // Empty placeholder matches: include them (they'll be displayed as part of the bracket tree)
-        return true;
+      const realMatches = competition.matches.filter((m: any) => {
+        if (!m.redCornerId && !m.blueCornerId) return false;
+        return athleteIdSet.has(m.redCornerId) || athleteIdSet.has(m.blueCornerId);
       });
-
-      // Sort by round then bracket position
-      catMatches.sort((a: any, b: any) => {
-        if (a.round !== b.round) return a.round - b.round;
-        return (a.bracketPosition || 1) - (b.bracketPosition || 1);
-      });
-
-      if (catMatches.length > 0) {
-        categoryMatches[cat.name] = catMatches;
+      if (realMatches.length > 0) {
+        categoryMatches[cat.name] = realMatches;
       }
     }
 
-    // Deduplicate empty matches across categories - an empty match should only appear in one category
-    const assignedEmptyMatchIds = new Set<string>();
-    for (const cat of categories) {
-      const filtered = categoryMatches[cat.name]?.filter((m: any) => {
-        if (!m.redCornerId && !m.blueCornerId) {
-          if (assignedEmptyMatchIds.has(m.id)) return false;
-          assignedEmptyMatchIds.add(m.id);
+    // Assign empty placeholder matches to the correct category.
+    // Each empty match at round R, bracketPosition P is logically fed by the two matches
+    // at round R-1 with bracketPositions (P-1)*2+1 and (P-1)*2+2.
+    // The category with the MOST feeder matches in the previous round gets the empty match.
+    // Empty matches are processed in round order so earlier rounds are assigned first,
+    // ensuring that when we reach round R, round R-1 empty matches are already assigned.
+    const emptyMatches = competition.matches
+      .filter((m: any) => !m.redCornerId && !m.blueCornerId)
+      .sort((a: any, b: any) => (a.round || 1) - (b.round || 1));
+
+    for (const emptyMatch of emptyMatches) {
+      const round = emptyMatch.round || 1;
+      const bracketPos = emptyMatch.bracketPosition || 1;
+      // Feeder bracket positions in the previous round
+      const feederPos1 = (bracketPos - 1) * 2 + 1;
+      const feederPos2 = feederPos1 + 1;
+
+      // Score each category by how many feeder matches it has at the feeder positions
+      let bestCategory: string | null = null;
+      let bestScore = 0;
+      for (const cat of categories) {
+        const catMatches = categoryMatches[cat.name] || [];
+        let score = 0;
+        for (const m of catMatches) {
+          if (m.round === round - 1 && m.bracketPosition === feederPos1) score++;
+          if (m.round === round - 1 && m.bracketPosition === feederPos2) score++;
         }
-        return true;
-      }) || [];
-      if (filtered.length > 0) {
-        categoryMatches[cat.name] = filtered;
-      } else {
-        delete categoryMatches[cat.name];
+        if (score > bestScore) {
+          bestScore = score;
+          bestCategory = cat.name;
+        }
       }
+
+      if (bestCategory) {
+        if (!categoryMatches[bestCategory]) categoryMatches[bestCategory] = [];
+        categoryMatches[bestCategory].push(emptyMatch);
+      }
+    }
+
+    // Sort matches within each category by round then bracket position
+    for (const catName of Object.keys(categoryMatches)) {
+      categoryMatches[catName].sort((a: any, b: any) => {
+        if (a.round !== b.round) return a.round - b.round;
+        return (a.bracketPosition || 1) - (b.bracketPosition || 1);
+      });
     }
 
     return {

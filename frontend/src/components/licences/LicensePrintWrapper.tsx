@@ -45,6 +45,19 @@ function computeAgeDivision(dateOfBirth: string | undefined): string {
   return "MASTERS_4";
 }
 
+/**
+ * Derive a short, human-readable licence number (same algorithm as LicenceCard).
+ */
+function hashToDisplayId(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  const base36 = (hash >>> 0).toString(36).toUpperCase().padStart(8, "0").slice(0, 8);
+  return `FTJJ-${base36.slice(0, 4)}-${base36.slice(4, 8)}`;
+}
+
 export default function LicensePrintWrapper({ license }: LicensePrintWrapperProps): JSX.Element {
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({ contentRef: printRef });
@@ -52,11 +65,17 @@ export default function LicensePrintWrapper({ license }: LicensePrintWrapperProp
   const person = license?.person;
   const club = person?.club;
   const ageDivision = computeAgeDivision(person?.dateOfBirth);
-  const code = person?.code || "";
-  const displayId = person?.displayId || license?.displayId || code || "";
-  const qrUrl = displayId
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(displayId)}`
+
+  // QR code encodes the licence ID for verification (scan → check validity/expiry).
+  const licenseId = license?.id || "";
+  const qrUrl = licenseId
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(licenseId)}`
     : "";
+
+  // Human-readable athlete ID: backend displayId, or derive from person ID/code.
+  const athleteId = person?.id || person?.code || "";
+  const displayId = person?.displayId || hashToDisplayId(athleteId);
+  const licenceCode = person?.code
   const seasonName = license?.season?.name || "";
 
   return (
@@ -69,8 +88,8 @@ export default function LicensePrintWrapper({ license }: LicensePrintWrapperProp
         <div className="licenceImg">
           <img src={licenceImage} alt="Licence FTJJ" />
           <div className="season">{seasonName || new Date().getFullYear()}</div>
-          <div className="licenceNumber">{code || "—"}</div>
-          <div className="holderId">{license?.id || "—"}</div>
+          <div className="licenceNumber">{licenceCode || "—"}</div>
+          <div className="holderId">{displayId || "—"}</div>
           <div className="firstName">
             {person?.firstName || "—"}
             {person?.arabicFirstName && (

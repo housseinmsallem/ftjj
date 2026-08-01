@@ -35,6 +35,7 @@ const directoryLinks: NavLinkItem[] = [
   { to: "/coaches", label: "Coachs" },
   { to: "/referees", label: "Arbitres" },
   { to: "/affiliation", label: "Affiliation" },
+  { to: "/arbitre/inscription", label: "Devenir arbitre" },
 ];
 
 const socialMarks = ["WA", "FB", "IG", "YT"];

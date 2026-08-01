@@ -978,8 +978,11 @@ export default function CsvImport(): React.ReactElement {
                     fontSize: "0.85rem",
                   }}
                 >
-                  {batchResult.errors.map((err, i) => (
-                    <li key={i}>{err}</li>
+                  {batchResult.errors.map((err: any, i: number) => (
+                    <li key={i}>
+                      {typeof err === "string" ? err : err.message || JSON.stringify(err)}
+                      {err.index !== undefined && ` (Athlete #${err.index + 1})`}
+                    </li>
                   ))}
                 </ul>
               )}

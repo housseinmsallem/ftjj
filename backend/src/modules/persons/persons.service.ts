@@ -339,6 +339,28 @@ export class PersonsService {
     return { message: "Personne supprimée avec succès" };
   }
 
+  async transferNoAuth(personId: string, clubId: string) {
+    const person = await this.prisma.person.findUnique({ where: { id: personId } });
+    if (!person) throw new NotFoundException("Personne non trouvée");
+
+    await this.prisma.person.update({
+      where: { id: personId },
+      data: { clubId },
+    });
+
+    const activeLicense = await this.prisma.license.findFirst({
+      where: { personId, isActive: true },
+    });
+    if (activeLicense) {
+      await this.prisma.license.update({
+        where: { id: activeLicense.id },
+        data: { licenseType: "B" },
+      });
+    }
+
+    return { message: "Athlète transféré avec licence type B (autorisation de transfert manquante)" };
+  }
+
   async batchCreate(
     dto: BatchCreatePersonDto,
     user?: { id: string; role: Role },

@@ -6,6 +6,7 @@ import PageHeader from "../components/shared/PageHeader";
 import LoadingSpinner from "../components/shared/LoadingSpinner";
 import EmptyState from "../components/shared/EmptyState";
 import StatusBadge from "../components/shared/StatusBadge";
+import LicenceCard from "../components/licences/licenceCard";
 import { NEWAZA_GRADES } from "../utils/formOptions";
 import { getWeightClass } from "../utils/weightClass";
 import type { Person, License, ClubRef } from "../types";
@@ -260,6 +261,41 @@ export default function IdentiteFederale(): React.ReactElement {
             )}
           </div>
         </div>
+
+        {/* Licence Card */}
+        {activeLicense && (
+          <div style={{ marginBottom: 32 }}>
+            <h3 style={sectionTitle}>🎫 Carte de licence</h3>
+            <LicenceCard
+              data={{
+                id: person.id,
+                code: (person as any).code,
+                displayId: (person as any).displayId,
+                licenseNumber: (activeLicense as any).licenseNumber ?? (activeLicense as any).number,
+                season: String(
+                  activeLicense.issuedAt
+                    ? new Date(activeLicense.issuedAt).getFullYear()
+                    : new Date().getFullYear(),
+                ),
+                firstName: person.firstName,
+                lastName: person.lastName,
+                arabicFirstName: (person as any).arabicFirstName,
+                arabicLastName: (person as any).arabicLastName,
+                birthDate: person.dateOfBirth,
+                category:
+                  person.type === "ATHLETE"
+                    ? getWeightClass(
+                        (person as any).athleteDetails?.weight ??
+                          (person as any).weight,
+                        person.gender,
+                      )
+                    : undefined,
+                club: person.club,
+                photo: person.photoUrl,
+              }}
+            />
+          </div>
+        )}
 
         {/* Two-column grid */}
         <div

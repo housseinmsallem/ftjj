@@ -101,11 +101,13 @@ export class PersonsController {
   @Post("batch")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "Créer plusieurs personnes en lot" })
+  @ApiOperation({ summary: "Creer plusieurs personnes en lot" })
   async batchCreate(
-    @Body() dto: BatchCreatePersonDto,
+    @Body() body: any,
     @CurrentUser() user?: { id: string; role: Role },
   ) {
+    // Accept both { persons: [...] } and raw array [...]
+    const dto: BatchCreatePersonDto = Array.isArray(body) ? { persons: body } : body;
     return this.personsService.batchCreate(dto, user);
   }
 
@@ -130,6 +132,18 @@ export class PersonsController {
     @CurrentUser() user?: { id: string; role: Role },
   ) {
     return this.personsService.update(id, dto, user);
+  }
+
+  @Patch(":id/transfer-no-auth")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Transferer un athlete sans autorisation -> licence type B" })
+  async transferNoAuth(
+    @Param("id") id: string,
+    @Body() dto: { clubId: string },
+  ) {
+    return this.personsService.transferNoAuth(id, dto.clubId);
   }
 
   @Delete(":id")

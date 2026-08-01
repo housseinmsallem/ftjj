@@ -19,6 +19,7 @@ interface PendingRegistration {
   _id: string;
   id?: string;
   email: string;
+  role?: string;
   club?: {
     _id?: string;
     id?: string;
@@ -27,6 +28,21 @@ interface PendingRegistration {
     documents?: ClubDoc[];
   };
   clubName?: string;
+  referee?: {
+    person?: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      dateOfBirth: string;
+      gender: string;
+      nationality: string;
+      identityDocumentType: string;
+      identityDocumentUrl?: string;
+      birthCertificateUrl?: string;
+      photoUrl?: string;
+    };
+    refereeDegreeAttestationUrl?: string;
+  };
   createdAt: string;
   status: string;
 }
@@ -59,7 +75,7 @@ export default function AdminAffiliationRequests(): React.ReactElement {
 
   const approveMutation = useMutation({
     mutationFn: ({ userId, comment }: { userId: string; comment?: string }) =>
-      api.post(`/auth/admin/approve-registration/${userId}`, { comment }),
+      api.post(`/auth/admin/approve-registration/${userId}`, { adminComment: comment }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["admin", "pending-registrations"],
@@ -74,7 +90,7 @@ export default function AdminAffiliationRequests(): React.ReactElement {
 
   const rejectMutation = useMutation({
     mutationFn: ({ userId, comment }: { userId: string; comment: string }) =>
-      api.post(`/auth/admin/reject-registration/${userId}`, { comment }),
+      api.post(`/auth/admin/reject-registration/${userId}`, { adminComment: comment }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["admin", "pending-registrations"],
@@ -132,8 +148,9 @@ export default function AdminAffiliationRequests(): React.ReactElement {
             <table className="smart-table">
               <thead>
                 <tr>
+                  <th>Type</th>
                   <th>Email</th>
-                  <th>Club</th>
+                  <th>Nom</th>
                   <th>Date</th>
                   <th>Statut</th>
                   <th>Actions</th>
@@ -149,6 +166,11 @@ export default function AdminAffiliationRequests(): React.ReactElement {
                         style={{ cursor: "pointer" }}
                         onClick={() => setExpandedId(isExpanded ? null : rid)}
                       >
+                        <td>
+                          <span style={{ background: reg.role === "REFEREE" ? "#2563eb" : "#d51332", color: "#fff", padding: "2px 8px", borderRadius: 4, fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase" }}>
+                            {reg.role === "REFEREE" ? "Arbitre" : "Club"}
+                          </span>
+                        </td>
                         <td
                           style={{
                             fontWeight: 600,
@@ -158,7 +180,7 @@ export default function AdminAffiliationRequests(): React.ReactElement {
                         >
                           {reg.email}
                         </td>
-                        <td>{reg.club?.name || reg.clubName || "—"}</td>
+                        <td>{reg.role === "REFEREE" ? `${reg.referee?.person?.firstName || ""} ${reg.referee?.person?.lastName || ""}`.trim() || "—" : reg.club?.name || reg.clubName || "—"}</td>
                         <td>
                           {reg.createdAt
                             ? new Date(reg.createdAt).toLocaleDateString(
@@ -217,7 +239,9 @@ export default function AdminAffiliationRequests(): React.ReactElement {
                               }}
                             >
                               📋 Détails de la demande —{" "}
-                              {reg.club?.name || reg.clubName || "Club"}
+                              {reg.role === "REFEREE"
+                                ? `${reg.referee?.person?.firstName || ""} ${reg.referee?.person?.lastName || ""}`.trim()
+                                : reg.club?.name || reg.clubName || "Club"}
                             </h3>
                             <div
                               style={{
@@ -234,9 +258,9 @@ export default function AdminAffiliationRequests(): React.ReactElement {
                                   }}
                                 >
                                   <strong style={{ color: "var(--text)" }}>
-                                    Email :
+                                    Type :
                                   </strong>{" "}
-                                  {reg.email}
+                                  {reg.role === "REFEREE" ? "Arbitre" : "Propriétaire de club"}
                                 </p>
                                 <p
                                   style={{
@@ -245,11 +269,43 @@ export default function AdminAffiliationRequests(): React.ReactElement {
                                   }}
                                 >
                                   <strong style={{ color: "var(--text)" }}>
-                                    Club :
+                                    Email :
                                   </strong>{" "}
-                                  {reg.club?.name || reg.clubName || "—"}
+                                  {reg.email}
                                 </p>
-                                {reg.club?.address && (
+                                {reg.role === "REFEREE" && reg.referee?.person ? (
+                                  <>
+                                    <p style={{ margin: "4px 0", color: "var(--muted)" }}>
+                                      <strong style={{ color: "var(--text)" }}>Nom :</strong>{" "}
+                                      {reg.referee.person.firstName} {reg.referee.person.lastName}
+                                    </p>
+                                    <p style={{ margin: "4px 0", color: "var(--muted)" }}>
+                                      <strong style={{ color: "var(--text)" }}>Date de naissance :</strong>{" "}
+                                      {reg.referee.person.dateOfBirth ? new Date(reg.referee.person.dateOfBirth).toLocaleDateString("fr-FR") : "—"}
+                                    </p>
+                                    <p style={{ margin: "4px 0", color: "var(--muted)" }}>
+                                      <strong style={{ color: "var(--text)" }}>Genre :</strong>{" "}
+                                      {reg.referee.person.gender === "MALE" ? "Homme" : "Femme"}
+                                    </p>
+                                    <p style={{ margin: "4px 0", color: "var(--muted)" }}>
+                                      <strong style={{ color: "var(--text)" }}>Nationalité :</strong>{" "}
+                                      {reg.referee.person.nationality || "—"}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p
+                                      style={{
+                                        margin: "4px 0",
+                                        color: "var(--muted)",
+                                      }}
+                                    >
+                                      <strong style={{ color: "var(--text)" }}>
+                                        Club :
+                                      </strong>{" "}
+                                      {reg.club?.name || reg.clubName || "—"}
+                                    </p>
+                                    {reg.club?.address && (
                                   <p
                                     style={{
                                       margin: "4px 0",
@@ -281,6 +337,8 @@ export default function AdminAffiliationRequests(): React.ReactElement {
                                       })
                                     : "—"}
                                 </p>
+                                  </>
+                                )}
                               </div>
                             </div>
                             <h4
