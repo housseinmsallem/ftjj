@@ -9,7 +9,6 @@ import { RegistrationsModule } from "./modules/registrations/registrations.modul
 import { PricingModule } from "./modules/pricing/pricing.module";
 import { CompetitionsModule } from "./modules/competitions/competitions.module";
 import { MatchesModule } from "./modules/matches/matches.module";
-import { UploadsModule } from "./modules/uploads/uploads.module";
 import { EmailModule } from "./modules/email/email.module";
 import { PublicModule } from "./modules/public/public.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
@@ -30,7 +29,6 @@ import { SeasonsModule } from "./modules/seasons/seasons.module";
     CompetitionsModule,
     MatchesModule,
     ScoringModule,
-    UploadsModule,
     EmailModule,
     PublicModule,
     DashboardModule,
